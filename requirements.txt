@@ -1,4 +1,5 @@
-# Dependensi untuk Tahap 1 & 2 (Kriptografi AES + Steganografi LSB)
+# Dependensi untuk HideBit (Kriptografi, Steganografi, Steganalisis & Server)
 cryptography>=41.0.0
 Pillow>=10.0.0
 numpy>=1.24.0
+flask>=3.0.0
