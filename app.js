@@ -78,7 +78,7 @@ function setupImagePicker({
       state.capacityBytes = 0;
       updateCapacity();
       const cp = document.getElementById("coverPreview");
-      if (cp) cp.innerHTML = "Cover Image";
+      if (cp) cp.innerHTML = '<span class="placeholder-text">Citra Cover</span>';
       const sz = document.getElementById("resultImageSize");
       if (sz) sz.textContent = "--";
     }
@@ -288,6 +288,13 @@ function resetHide() {
   coverPicker.clearSelection();
   secretFilePicker.clear();
   state.stegoDataUrl = null;
+
+  const cp = document.getElementById("coverPreview");
+  if (cp) cp.innerHTML = '<span class="placeholder-text">Citra Cover</span>';
+  const sp = document.getElementById("stegoPreview");
+  if (sp) sp.innerHTML = '<span class="placeholder-text">Citra Stego</span>';
+  const dp = document.getElementById("diffPreview");
+  if (dp) dp.innerHTML = '<span class="placeholder-text">Peta Sebaran PRNG</span>';
 }
 
 async function handleHideMessage() {
@@ -343,12 +350,14 @@ async function handleHideMessage() {
 
     // Tampilkan pratinjau citra stego
     const preview = document.getElementById("stegoPreview");
-    preview.innerHTML = `<img src="${state.stegoDataUrl}" alt="Stego image preview"><small>Protected</small>`;
+    if (preview) {
+      preview.innerHTML = `<img src="${state.stegoDataUrl}" alt="Citra Stego">`;
+    }
 
     // Tampilkan pratinjau Difference Heatmap (Peta Sebaran PRNG)
     const diffPreview = document.getElementById("diffPreview");
     if (diffPreview && data.difference_map) {
-      diffPreview.innerHTML = `<img src="${data.difference_map}" alt="Difference Map"><small>PRNG Spread (×255)</small>`;
+      diffPreview.innerHTML = `<img src="${data.difference_map}" alt="Peta Sebaran PRNG">`;
     }
 
     // Update spesifikasi metrik
@@ -634,10 +643,10 @@ document.getElementById("analyzeButton").addEventListener("click", handleStegana
 document.getElementById("copyButton").addEventListener("click", async (event) => {
   try {
     await navigator.clipboard.writeText(document.getElementById("revealedText").textContent);
-    event.currentTarget.textContent = "Copied ✓";
-    setTimeout(() => { event.currentTarget.textContent = "Copy Message"; }, 2000);
+    event.currentTarget.textContent = "Tersalin";
+    setTimeout(() => { event.currentTarget.textContent = "Salin Pesan"; }, 2000);
   } catch {
-    event.currentTarget.textContent = "Select to copy";
+    event.currentTarget.textContent = "Pilih untuk Salin";
   }
 });
 

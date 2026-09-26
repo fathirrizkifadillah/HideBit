@@ -10,23 +10,60 @@
 .lsb-img{width:100%;aspect-ratio:1;background:#eef2f1;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#8b9695;font-size:12px}
 .lsb-img img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
 .diff-preview{background:#0e1315!important;border:1px solid #233133!important;color:#6ed7cb!important;font-weight:700}
-.diff-preview small{display:block;margin-top:4px;padding:3px 7px;background:rgba(13,157,145,.25);color:#77d4c8;border-radius:5px;font-size:9px}
-.preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important;gap:14px!important;margin:24px 0!important}
 
-/* Selected Image Card & Instant Thumbnail */
-.selected-card{display:flex;gap:16px;align-items:center;padding:14px;background:var(--soft);border:1px solid var(--line);border-radius:12px;margin-bottom:6px}
-.selected-thumb-wrap{width:90px;height:90px;flex:none;border-radius:9px;overflow:hidden;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center}
-.selected-thumb-wrap img{width:100%;height:100%;object-fit:cover}
-.selected-info{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
-.file-meta-content{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted);word-break:break-word}
+/* Visuals Row (3 Kolom Pratinjau Citra Bersih & Rapi) */
+.visuals-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:22px 0 16px 0}
+@media(max-width:850px){.visuals-row{grid-template-columns:1fr}}
+.visual-box{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.visual-box-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#fbfdfc;border-bottom:1px solid var(--line)}
+.visual-title{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:13px;color:var(--ink)}
+.vbadge{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:4px}
+.vbadge.neutral{background:var(--soft);color:var(--muted)}
+.vbadge.success{background:var(--teal-pale);color:var(--teal-dark)}
+.vbadge.info{background:#e6f3f8;color:#216b8a}
+
+.visual-display{height:230px;background:#0d1214;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:10px}
+.visual-display img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block}
+.visual-display .placeholder-text{color:#7b8988;font-size:12px}
+
+/* Specs Summary Grid (Grid Teratur 5 Kolom Rapi) */
+.specs-summary-card{margin:16px 0 20px 0;padding:18px 22px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.specs-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px 20px}
+.spec-item{display:flex;flex-direction:column;gap:3px}
+.spec-kicker{font-size:11px;color:var(--muted);font-weight:500}
+.spec-item strong,.spec-item em{font-size:13px;font-style:normal;font-weight:700;color:var(--ink);font-family:"Space Grotesk",sans-serif;word-break:break-word}
+
+/* Selected Card & Instant Thumbnail */
+.selected-card{display:flex;gap:16px;align-items:center;padding:14px 16px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-top:10px}
+.selected-thumb-wrap{width:72px;height:72px;flex:none;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#0f1416;display:flex;align-items:center;justify-content:center;padding:4px}
+.selected-thumb-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.selected-file-badge{width:72px;height:72px;flex:none;border-radius:8px;background:var(--teal-pale);border:1px solid #bce1db;color:var(--teal-dark);font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:14px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;text-transform:uppercase}
+.selected-info{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.file-meta-content{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted);word-break:break-word}
 .file-meta-content strong{color:var(--ink);font-size:14px;font-family:"Space Grotesk",sans-serif}
 .selected-btn-group{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}
-.btn-sm{padding:7px 13px!important;min-height:32px!important;font-size:12px!important;border-radius:7px!important;cursor:pointer}
+.btn-sm{padding:6px 12px!important;min-height:30px!important;font-size:12px!important;border-radius:6px!important;cursor:pointer}
 .button.danger{color:#c93b3b;background:#fff;border-color:#f1c5c5}
 .button.danger:hover{background:#ffebeb;border-color:#c93b3b}
 
+/* Payload Mode Tabs (Clean Segmented, No Emoji) */
+.payload-tab-group{display:flex;gap:6px;margin-bottom:14px;background:#edf2f1;padding:4px;border-radius:8px;border:1px solid var(--line)}
+.payload-tab{flex:1;padding:9px 16px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s ease;text-align:center}
+.payload-tab:hover{color:var(--ink)}
+.payload-tab.active{background:#fff;color:var(--teal-dark);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+
+/* Reveal File Card */
+.reveal-file-card{margin:24px 0 20px;padding:18px 20px;background:#222b2c;border:1px solid #354243;border-radius:12px;display:flex;align-items:center;gap:16px}
+.reveal-file-icon-wrap{width:50px;height:50px;border-radius:8px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.reveal-file-badge{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:13px;letter-spacing:.5px;text-transform:uppercase}
+.reveal-file-info{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.reveal-kicker{font-size:10px;font-weight:700;letter-spacing:1px;color:#6ed7cb;text-transform:uppercase}
+.reveal-file-info h4{margin:0;font-size:15px;color:#fff;font-family:"Space Grotesk",sans-serif;word-break:break-all}
+.reveal-file-info small{color:#aeb8b8;font-size:12px}
+.download-doc-btn{flex:none;padding:9px 18px!important;font-size:13px!important;min-height:38px!important;text-decoration:none!important;display:inline-flex!important;align-items:center!important}
+
 /* Difference Statistics Box */
-.diff-stats-box{margin-top:22px;padding:22px;background:#fbfdfc;border:1px solid var(--line);border-radius:12px}
+.diff-stats-box{margin-top:16px;padding:22px;background:#fbfdfc;border:1px solid var(--line);border-radius:12px}
 .diff-stats-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .diff-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--teal);text-transform:uppercase}
 .diff-stats-head h4{margin:3px 0 0 0;font-size:16px;color:var(--ink);font-family:"Space Grotesk",sans-serif}
@@ -41,24 +78,4 @@
 .diff-stats-note{margin:14px 0 0 0;padding-top:12px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);line-height:1.5}
 .diff-stats-note b{color:var(--ink)}
 .diff-stats-note span{font-weight:700;color:var(--teal-dark)}
-
-/* Payload Mode Tabs */
-.payload-tab-group{display:flex;gap:8px;margin-bottom:14px;background:var(--soft);padding:5px;border-radius:9px;border:1px solid var(--line)}
-.payload-tab{flex:1;padding:8px 14px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s ease;display:flex;align-items:center;justify-content:center;gap:6px}
-.payload-tab:hover{color:var(--ink)}
-.payload-tab.active{background:#fff;color:var(--teal-dark);box-shadow:0 2px 8px rgba(0,0,0,.06)}
-
-/* Document Icon Badge */
-.doc-icon-wrap{background:linear-gradient(135deg,#e4f5f2,#c7ece6)!important;display:flex!important;align-items:center!important;justify-content:center!important}
-.doc-icon-ext{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:14px;letter-spacing:.5px;color:var(--teal-dark);text-transform:uppercase}
-
-/* Reveal File Card */
-.reveal-file-card{margin:24px 0 20px;padding:20px;background:#222b2c;border:1px solid #354243;border-radius:12px;display:flex;align-items:center;gap:16px}
-.reveal-file-icon-wrap{width:56px;height:56px;border-radius:10px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 4px 14px rgba(13,157,145,.35)}
-.reveal-file-badge{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:13px;letter-spacing:.5px;text-transform:uppercase}
-.reveal-file-info{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
-.reveal-kicker{font-size:10px;font-weight:700;letter-spacing:1px;color:#6ed7cb;text-transform:uppercase}
-.reveal-file-info h4{margin:0;font-size:16px;color:#fff;font-family:"Space Grotesk",sans-serif;word-break:break-all}
-.reveal-file-info small{color:#aeb8b8;font-size:12px}
-.download-doc-btn{flex:none;padding:10px 18px!important;font-size:13px!important;min-height:40px!important;text-decoration:none!important;display:inline-flex!important;align-items:center!important;gap:8px!important}
 
