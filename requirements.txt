@@ -1,5 +1,6 @@
-# Dependensi untuk HideBit (Kriptografi, Steganografi, Steganalisis & Server)
+# Dependensi untuk HideBit (Kriptografi, Steganografi, Steganalisis & Server Produksi)
 cryptography>=41.0.0
 Pillow>=10.0.0
 numpy>=1.24.0
 flask>=3.0.0
+gunicorn>=21.2.0
