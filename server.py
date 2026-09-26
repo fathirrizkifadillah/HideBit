@@ -11,9 +11,13 @@ import traceback
 from flask import Flask, request, jsonify, send_from_directory
 from PIL import Image
 
-from src.crypto import encrypt_message, decrypt_message, get_compression_info
+from src.crypto import (
+    encrypt_message, decrypt_message,
+    encrypt_payload_data, decrypt_payload_data,
+    get_compression_info
+)
 from src.stego import embed_payload, extract_payload, get_image_capacity
-from src.steganalysis import analyze_image, lsb_plane, extract_message
+from src.steganalysis import analyze_image, lsb_plane, extract_message, extract_payload_data
 from src.metrics import get_image_metrics, get_histogram_data, image_to_base64, generate_difference_heatmap
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -56,28 +60,46 @@ def check_capacity():
 @app.route("/api/embed", methods=["POST"])
 def embed():
     """
-    Menyisipkan pesan rahasia terenkripsi AES-256-GCM ke LSB citra cover
-    dengan sebaran piksel teracak PRNG.
+    Menyisipkan pesan rahasia (teks atau berkas biner) terenkripsi AES-256-GCM
+    ke LSB citra cover dengan sebaran piksel teracak PRNG.
     """
     if "cover" not in request.files:
         return jsonify({"success": False, "error": "Berkas cover image wajib diunggah."}), 400
     
-    message = request.form.get("message", "").strip()
     key = request.form.get("key", "").strip()
-
-    if not message:
-        return jsonify({"success": False, "error": "Pesan rahasia tidak boleh kosong."}), 400
     if not key:
         return jsonify({"success": False, "error": "Stego-key tidak boleh kosong."}), 400
+
+    # Cek apakah payload berupa berkas biner atau pesan teks
+    is_file = "secret_file" in request.files and request.files["secret_file"].filename != ""
+    secret_file = request.files.get("secret_file") if is_file else None
+    message = request.form.get("message", "").strip()
+
+    if not is_file and not message:
+        return jsonify({"success": False, "error": "Pesan teks atau berkas rahasia wajib diisi/diunggah."}), 400
 
     try:
         cover_file = request.files["cover"]
         cover_img = Image.open(cover_file.stream).convert("RGB")
         capacity = get_image_capacity(cover_img)
 
-        # 1. Enkripsi pesan dengan AES-256-GCM + PBKDF2 (adaptif zlib)
-        comp_info = get_compression_info(message)
-        encrypted_payload = encrypt_message(message, key)
+        # 1. Enkripsi payload dengan AES-256-GCM + PBKDF2 (kompresi adaptif zlib)
+        if is_file:
+            file_bytes = secret_file.read()
+            filename = os.path.basename(secret_file.filename)
+            comp_info = get_compression_info(file_bytes)
+            encrypted_payload = encrypt_payload_data(file_bytes, data_type="file", filename=filename, password=key)
+            payload_type = "file"
+            payload_label = filename
+            raw_size = len(file_bytes)
+        else:
+            text_bytes = message.encode("utf-8")
+            comp_info = get_compression_info(text_bytes)
+            encrypted_payload = encrypt_payload_data(text_bytes, data_type="text", filename="", password=key)
+            payload_type = "text"
+            payload_label = f"{len(message)} karakter"
+            raw_size = len(text_bytes)
+
         payload_len = len(encrypted_payload)
 
         # 2. Sisipkan ke citra cover menggunakan LSB teracak PRNG
@@ -100,8 +122,11 @@ def embed():
             "difference_map": diff_b64,
             "metrics": metrics,
             "compression": comp_info,
+            "payload_type": payload_type,
+            "payload_label": payload_label,
             "payload_bytes": payload_len,
-            "message_chars": len(message),
+            "raw_bytes": raw_size,
+            "message_chars": len(message) if not is_file else 0,
             "capacity_bytes": capacity["max_payload_bytes"],
             "capacity_percent": used_percent,
             "image_size": f"{cover_img.width} x {cover_img.height} px"
@@ -117,7 +142,7 @@ def embed():
 @app.route("/api/extract", methods=["POST"])
 def extract():
     """
-    Mengekstrak dan mendekripsi pesan rahasia dari stego image menggunakan stego-key.
+    Mengekstrak dan mendekripsi payload rahasia (teks atau berkas) dari stego image menggunakan stego-key.
     """
     if "stego" not in request.files:
         return jsonify({"success": False, "error": "Berkas stego image wajib diunggah."}), 400
@@ -131,12 +156,25 @@ def extract():
         stego_img = Image.open(stego_file.stream).convert("RGB")
 
         # Ekstrak payload dari LSB PRNG dan dekripsi dengan AES-256-GCM
-        revealed_message = extract_message(stego_img, key)
-
-        return jsonify({
-            "success": True,
-            "message": revealed_message
-        })
+        revealed = extract_payload_data(stego_img, key)
+        if revealed["type"] == "file":
+            import base64
+            file_b64 = base64.b64encode(revealed["data"]).decode("ascii")
+            return jsonify({
+                "success": True,
+                "type": "file",
+                "filename": revealed["filename"],
+                "file_data": file_b64,
+                "size": revealed["size"],
+                "message": f"Berkas rahasia '{revealed['filename']}' ({revealed['size']} byte) berhasil diekstrak."
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "type": "text",
+                "message": revealed["text"],
+                "size": revealed["size"]
+            })
 
     except ValueError as ve:
         return jsonify({"success": False, "error": str(ve)}), 400

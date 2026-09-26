@@ -41,4 +41,24 @@
 .diff-stats-note{margin:14px 0 0 0;padding-top:12px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);line-height:1.5}
 .diff-stats-note b{color:var(--ink)}
 .diff-stats-note span{font-weight:700;color:var(--teal-dark)}
+
+/* Payload Mode Tabs */
+.payload-tab-group{display:flex;gap:8px;margin-bottom:14px;background:var(--soft);padding:5px;border-radius:9px;border:1px solid var(--line)}
+.payload-tab{flex:1;padding:8px 14px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s ease;display:flex;align-items:center;justify-content:center;gap:6px}
+.payload-tab:hover{color:var(--ink)}
+.payload-tab.active{background:#fff;color:var(--teal-dark);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+
+/* Document Icon Badge */
+.doc-icon-wrap{background:linear-gradient(135deg,#e4f5f2,#c7ece6)!important;display:flex!important;align-items:center!important;justify-content:center!important}
+.doc-icon-ext{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:14px;letter-spacing:.5px;color:var(--teal-dark);text-transform:uppercase}
+
+/* Reveal File Card */
+.reveal-file-card{margin:24px 0 20px;padding:20px;background:#222b2c;border:1px solid #354243;border-radius:12px;display:flex;align-items:center;gap:16px}
+.reveal-file-icon-wrap{width:56px;height:56px;border-radius:10px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 4px 14px rgba(13,157,145,.35)}
+.reveal-file-badge{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:13px;letter-spacing:.5px;text-transform:uppercase}
+.reveal-file-info{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.reveal-kicker{font-size:10px;font-weight:700;letter-spacing:1px;color:#6ed7cb;text-transform:uppercase}
+.reveal-file-info h4{margin:0;font-size:16px;color:#fff;font-family:"Space Grotesk",sans-serif;word-break:break-all}
+.reveal-file-info small{color:#aeb8b8;font-size:12px}
+.download-doc-btn{flex:none;padding:10px 18px!important;font-size:13px!important;min-height:40px!important;text-decoration:none!important;display:inline-flex!important;align-items:center!important;gap:8px!important}
 

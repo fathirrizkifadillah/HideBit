@@ -13,9 +13,12 @@ const state = {
   coverFile: null,
   stegoFile: null,
   analysisFile: null,
+  secretFile: null,
   coverUrl: null,
   stegoDataUrl: null,
   capacityBytes: 0,
+  payloadMode: "text", // "text" | "file"
+  revealedBlobUrl: null,
 };
 
 function setRoute(route) {
@@ -132,16 +135,36 @@ function setupImagePicker({
 }
 
 function updateCapacity() {
-  const message = document.getElementById("messageInput").value;
-  const msgBytes = new TextEncoder().encode(message).length;
-  // Payload enkripsi overhead: 16 salt + 12 nonce + 16 auth tag = 44 bytes
-  const estPayloadBytes = msgBytes > 0 ? msgBytes + 44 : 0;
+  let estPayloadBytes = 0;
+  if (state.payloadMode === "file") {
+    if (state.secretFile) {
+      const fnBytes = new TextEncoder().encode(state.secretFile.name).length;
+      // Overhead envelope berkas: 1B tag + 1B fn_len + fnBytes + 16 salt + 12 nonce + 16 auth tag = 46 + fnBytes
+      estPayloadBytes = state.secretFile.size + fnBytes + 46;
+    }
+  } else {
+    const message = document.getElementById("messageInput").value;
+    const msgBytes = new TextEncoder().encode(message).length;
+    // Payload enkripsi teks: 1B tag + 16 salt + 12 nonce + 16 auth tag = 45 bytes
+    estPayloadBytes = msgBytes > 0 ? msgBytes + 45 : 0;
+    const charCountEl = document.getElementById("charCount");
+    if (charCountEl) charCountEl.textContent = `${message.length} / 50000`;
+  }
+
   const maxBytes = state.capacityBytes || 1;
   const percent = Math.min(100, Math.round((estPayloadBytes / maxBytes) * 100));
 
-  document.getElementById("capacityText").textContent = `${percent}%`;
-  document.getElementById("capacityBar").style.width = `${percent}%`;
-  document.getElementById("charCount").textContent = `${message.length} / 1000`;
+  const capText = document.getElementById("capacityText");
+  const capBar = document.getElementById("capacityBar");
+  if (capText) capText.textContent = `${percent}%`;
+  if (capBar) {
+    capBar.style.width = `${percent}%`;
+    if (percent >= 100 && estPayloadBytes > maxBytes) {
+      capBar.style.background = "var(--red)";
+    } else {
+      capBar.style.background = "var(--teal)";
+    }
+  }
 }
 
 // Inisialisasi Image Pickers dengan Thumbnail & Tombol Batal/Ganti
@@ -175,27 +198,103 @@ const analysisPicker = setupImagePicker({
   kind: "analysis",
 });
 
+// Setup Secret File Picker
+function setupSecretFilePicker() {
+  const input = document.getElementById("secretFileInput");
+  const drop = document.getElementById("secretFileDrop");
+  const card = document.getElementById("secretFileCard");
+  const badge = document.getElementById("secretFileExtBadge");
+  const meta = document.getElementById("secretFileMeta");
+  const cancelBtn = document.getElementById("secretFileCancelBtn");
+
+  const clear = () => {
+    if (input) input.value = "";
+    state.secretFile = null;
+    if (meta) meta.innerHTML = "";
+    if (card) card.classList.add("hidden");
+    if (drop) drop.classList.remove("hidden");
+    updateCapacity();
+  };
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      clear();
+    });
+  }
+
+  if (input) {
+    input.addEventListener("change", () => {
+      const file = input.files[0];
+      if (!file) return;
+      state.secretFile = file;
+
+      const ext = file.name.includes(".") ? file.name.split(".").pop().toUpperCase().slice(0, 4) : "FILE";
+      if (badge) badge.textContent = ext;
+      if (meta) {
+        meta.innerHTML = `<strong>${file.name}</strong><span>${formatBytes(file.size)} (${file.size.toLocaleString()} bytes)</span>`;
+      }
+      if (drop) drop.classList.add("hidden");
+      if (card) card.classList.remove("hidden");
+      updateCapacity();
+    });
+  }
+
+  return { clear };
+}
+
+const secretFilePicker = setupSecretFilePicker();
+
+// Setup Payload Mode Switcher (Teks vs Berkas)
+function setupPayloadTabs() {
+  const tabText = document.getElementById("tabPayloadText");
+  const tabFile = document.getElementById("tabPayloadFile");
+  const secText = document.getElementById("textPayloadSection");
+  const secFile = document.getElementById("filePayloadSection");
+
+  if (!tabText || !tabFile) return;
+
+  tabText.addEventListener("click", () => {
+    state.payloadMode = "text";
+    tabText.classList.add("active");
+    tabFile.classList.remove("active");
+    if (secText) secText.classList.remove("hidden");
+    if (secFile) secFile.classList.add("hidden");
+    updateCapacity();
+  });
+
+  tabFile.addEventListener("click", () => {
+    state.payloadMode = "file";
+    tabFile.classList.add("active");
+    tabText.classList.remove("active");
+    if (secFile) secFile.classList.remove("hidden");
+    if (secText) secText.classList.add("hidden");
+    updateCapacity();
+  });
+}
+
+setupPayloadTabs();
+
 function resetHide() {
   document.getElementById("hideResult").classList.add("hidden");
   document.getElementById("messageInput").value = "";
   document.getElementById("hideKey").value = "";
-  document.getElementById("charCount").textContent = "0 / 1000";
+  const charCountEl = document.getElementById("charCount");
+  if (charCountEl) charCountEl.textContent = "0 / 50000";
   document.getElementById("capacityText").textContent = "0%";
-  document.getElementById("capacityBar").style.width = "0%";
+  const capBar = document.getElementById("capacityBar");
+  capBar.style.width = "0%";
+  capBar.style.background = "var(--teal)";
   coverPicker.clearSelection();
+  secretFilePicker.clear();
   state.stegoDataUrl = null;
 }
 
 async function handleHideMessage() {
-  const message = document.getElementById("messageInput").value.trim();
   const key = document.getElementById("hideKey").value.trim();
 
   if (!state.coverFile) {
     alert("Silakan pilih citra cover terlebih dahulu.");
-    return;
-  }
-  if (!message) {
-    alert("Pesan rahasia tidak boleh kosong.");
     return;
   }
   if (!key) {
@@ -203,15 +302,29 @@ async function handleHideMessage() {
     return;
   }
 
+  const formData = new FormData();
+  formData.append("cover", state.coverFile);
+  formData.append("key", key);
+
+  if (state.payloadMode === "file") {
+    if (!state.secretFile) {
+      alert("Silakan pilih berkas rahasia yang ingin disembunyikan.");
+      return;
+    }
+    formData.append("secret_file", state.secretFile);
+  } else {
+    const message = document.getElementById("messageInput").value.trim();
+    if (!message) {
+      alert("Pesan rahasia tidak boleh kosong.");
+      return;
+    }
+    formData.append("message", message);
+  }
+
   // Tampilkan loading screen
   setRoute("processing");
 
   try {
-    const formData = new FormData();
-    formData.append("cover", state.coverFile);
-    formData.append("message", message);
-    formData.append("key", key);
-
     const res = await fetch("/api/embed", {
       method: "POST",
       body: formData,
@@ -239,11 +352,24 @@ async function handleHideMessage() {
     }
 
     // Update spesifikasi metrik
-    document.getElementById("resultMessageSize").textContent = `${data.payload_bytes} B (${data.message_chars} chars)`;
+    const pTypeEl = document.getElementById("resultPayloadType");
+    if (pTypeEl) {
+      pTypeEl.textContent = data.payload_type === "file" ? `Berkas (${data.payload_label})` : "Pesan Teks";
+    }
+
+    const pSizeEl = document.getElementById("resultMessageSize");
+    if (pSizeEl) {
+      if (data.payload_type === "file") {
+        pSizeEl.textContent = `${formatBytes(data.raw_bytes)} (${data.payload_bytes} B cipher)`;
+      } else {
+        pSizeEl.textContent = `${data.payload_bytes} B (${data.message_chars} chars)`;
+      }
+    }
+
     const compEl = document.getElementById("resultCompression");
     if (compEl) {
       if (data.compression && data.compression.is_compressed) {
-        compEl.textContent = `zlib -${data.compression.ratio_percent}% (${data.compression.saved_bytes}B saved)`;
+        compEl.textContent = `zlib -${data.compression.ratio_percent}% (${formatBytes(data.compression.saved_bytes)} saved)`;
         compEl.style.color = "var(--teal)";
       } else {
         compEl.textContent = "Raw (no gain)";
@@ -261,7 +387,7 @@ async function handleHideMessage() {
       document.getElementById("resultCapacity").textContent = `${data.capacity_percent}%`;
     }
     if (document.getElementById("resultChangedPixels")) {
-      document.getElementById("resultChangedPixels").textContent = `${data.metrics.changed_pixels} px (${data.metrics.pixel_change_percent}%)`;
+      document.getElementById("resultChangedPixels").textContent = `${data.metrics.changed_pixels.toLocaleString()} px (${data.metrics.pixel_change_percent}%)`;
     }
 
     // Update Kotak Statistik Komparasi Piksel Mendalam
@@ -301,6 +427,9 @@ async function handleRevealMessage() {
   const key = document.getElementById("revealKey").value.trim();
   const errorBanner = document.getElementById("revealError");
   const resultCard = document.getElementById("revealResult");
+  const textBox = document.getElementById("revealedTextBox");
+  const fileCard = document.getElementById("revealedFileCard");
+  const copyBtn = document.getElementById("copyButton");
 
   if (!state.stegoFile) {
     alert("Silakan unggah citra stego terlebih dahulu.");
@@ -330,7 +459,56 @@ async function handleRevealMessage() {
     if (data.success) {
       errorBanner.classList.add("hidden");
       resultCard.classList.remove("hidden");
-      document.getElementById("revealedText").textContent = data.message;
+
+      if (data.type === "file") {
+        const headEl = document.getElementById("revealResultHeading");
+        const subEl = document.getElementById("revealResultSub");
+        if (headEl) headEl.textContent = "Berkas Rahasia Terbaca";
+        if (subEl) subEl.textContent = "Berkas biner rahasia berhasil didekripsi dan diverifikasi otentik.";
+        if (textBox) textBox.classList.add("hidden");
+        if (fileCard) fileCard.classList.remove("hidden");
+        if (copyBtn) copyBtn.classList.add("hidden");
+
+        const ext = data.filename && data.filename.includes(".") ? data.filename.split(".").pop().toUpperCase().slice(0, 4) : "FILE";
+        const badge = document.getElementById("revealedFileBadge");
+        if (badge) badge.textContent = ext;
+
+        const fnEl = document.getElementById("revealedFileName");
+        if (fnEl) fnEl.textContent = data.filename;
+
+        const szEl = document.getElementById("revealedFileSize");
+        if (szEl) szEl.textContent = `${formatBytes(data.size)} (${data.size.toLocaleString()} bytes)`;
+
+        // Konversi base64 string kembali menjadi Blob biner
+        const binaryStr = atob(data.file_data);
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: "application/octet-stream" });
+
+        if (state.revealedBlobUrl) {
+          URL.revokeObjectURL(state.revealedBlobUrl);
+        }
+        state.revealedBlobUrl = URL.createObjectURL(blob);
+
+        const dlBtn = document.getElementById("downloadRevealedFileBtn");
+        if (dlBtn) {
+          dlBtn.href = state.revealedBlobUrl;
+          dlBtn.download = data.filename;
+        }
+      } else {
+        const headEl = document.getElementById("revealResultHeading");
+        const subEl = document.getElementById("revealResultSub");
+        if (headEl) headEl.textContent = "Pesan Rahasia Terbaca";
+        if (subEl) subEl.textContent = "Pesan teks rahasia berhasil didekripsi dan diverifikasi otentik.";
+        if (fileCard) fileCard.classList.add("hidden");
+        if (textBox) textBox.classList.remove("hidden");
+        if (copyBtn) copyBtn.classList.remove("hidden");
+        document.getElementById("revealedText").textContent = data.message;
+      }
+
       resultCard.scrollIntoView({ behavior: "smooth" });
     } else {
       resultCard.classList.add("hidden");

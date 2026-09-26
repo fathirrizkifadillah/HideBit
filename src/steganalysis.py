@@ -14,7 +14,7 @@ from typing import Any, Dict
 import numpy as np
 from PIL import Image
 
-from .crypto import decrypt_message
+from .crypto import decrypt_message, decrypt_payload_data
 from .stego import extract_payload
 
 
@@ -24,6 +24,14 @@ def extract_message(stego_image: Image.Image, stego_key: str) -> str:
         raise ValueError("Stego-key harus berupa string dan tidak boleh kosong.")
     payload = extract_payload(stego_image, stego_key)
     return decrypt_message(payload, stego_key)
+
+
+def extract_payload_data(stego_image: Image.Image, stego_key: str) -> Dict[str, Any]:
+    """Extract and decrypt either a text message or a hidden binary file."""
+    if not isinstance(stego_key, str) or not stego_key:
+        raise ValueError("Stego-key harus berupa string dan tidak boleh kosong.")
+    payload = extract_payload(stego_image, stego_key)
+    return decrypt_payload_data(payload, stego_key)
 
 
 def lsb_plane(image: Image.Image, channel: int = 0) -> Image.Image:

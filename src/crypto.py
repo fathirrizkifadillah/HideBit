@@ -2,6 +2,7 @@
 src/crypto.py
 =============
 Modul Kriptografi & Kompresi untuk HideBit
+- Dukungan Fleksibel: Menyembunyikan Pesan Teks (UTF-8) atau Berkas Biner (PDF, DOCX, ZIP, TXT, dll.)
 - Kompresi Data: zlib (Deflate level 9) adaptif sebelum enkripsi
 - Algoritma Enkripsi: AES-256-GCM (Authenticated Encryption with Associated Data)
 - Derivasi Kunci: PBKDF2-HMAC-SHA256 (100.000 iterasi dengan Salt acak 16 byte)
@@ -29,6 +30,9 @@ PBKDF2_ITERATIONS = 100_000
 FLAG_UNCOMPRESSED = b"\x00"
 FLAG_ZLIB_COMPRESSED = b"\x01"
 
+TAG_TYPE_TEXT = b"T"
+TAG_TYPE_FILE = b"F"
+
 
 def derive_key(password: str, salt: bytes) -> bytes:
     """
@@ -47,13 +51,12 @@ def derive_key(password: str, salt: bytes) -> bytes:
     return kdf.derive(password.encode("utf-8"))
 
 
-def get_compression_info(plaintext: str) -> Dict[str, Any]:
+def get_compression_info(data_bytes: bytes) -> Dict[str, Any]:
     """
-    Menghitung estimasi efisiensi kompresi zlib pada plaintext.
+    Menghitung estimasi efisiensi kompresi zlib pada data bytes.
     """
-    raw_bytes = plaintext.encode("utf-8")
-    compressed = zlib.compress(raw_bytes, level=9)
-    raw_len = len(raw_bytes)
+    compressed = zlib.compress(data_bytes, level=9)
+    raw_len = len(data_bytes)
     comp_len = len(compressed)
 
     if comp_len < raw_len:
@@ -75,90 +78,127 @@ def get_compression_info(plaintext: str) -> Dict[str, Any]:
     }
 
 
-def encrypt_message(plaintext: str, password: str) -> bytes:
+def encrypt_payload_data(data: bytes, data_type: str = "text", filename: str = "", password: str = "") -> bytes:
     """
-    Kompresi teks (zlib) lalu enkripsi menggunakan AES-256-GCM.
+    Membungkus data (teks atau berkas biner), mengompresi secara adaptif (zlib),
+    lalu mengenkripsi menggunakan AES-256-GCM.
     
-    Format payload yang dihasilkan:
-    [ SALT (16 byte) ] + [ NONCE (12 byte) ] + [ CIPHERTEXT(FLAG + DATA) + AUTH TAG (16 byte) ]
+    Format Envelope:
+    - Text: [ b'T' (1B) ] + [ DATA_BYTES ]
+    - File: [ b'F' (1B) ] + [ FN_LEN (1B uint8) ] + [ FILENAME ] + [ FILE_DATA_BYTES ]
     
-    Returns:
-        bytes: Data terenkripsi siap disisipkan ke citra.
+    Format Payload Akhir:
+    [ SALT (16B) ] + [ NONCE (12B) ] + [ CIPHERTEXT(FLAG + ENVELOPE) + AUTH TAG (16B) ]
     """
-    if not plaintext:
-        raise ValueError("Pesan rahasia tidak boleh kosong.")
+    if not data:
+        raise ValueError("Data rahasia tidak boleh kosong.")
     if not password:
         raise ValueError("Stego-key tidak boleh kosong.")
 
-    raw_bytes = plaintext.encode("utf-8")
-    compressed_bytes = zlib.compress(raw_bytes, level=9)
+    # 1. Susun Envelope sesuai tipe data
+    if data_type == "file":
+        safe_fn = (filename or "secret_file.bin").encode("utf-8")[:255]
+        envelope = TAG_TYPE_FILE + bytes([len(safe_fn)]) + safe_fn + data
+    else:
+        envelope = TAG_TYPE_TEXT + data
 
-    # 1. Kompresi adaptif: hanya pakai zlib jika ukuran lebih kecil
-    if len(compressed_bytes) < len(raw_bytes):
+    # 2. Kompresi adaptif zlib
+    compressed_bytes = zlib.compress(envelope, level=9)
+    if len(compressed_bytes) < len(envelope):
         body = FLAG_ZLIB_COMPRESSED + compressed_bytes
     else:
-        body = FLAG_UNCOMPRESSED + raw_bytes
+        body = FLAG_UNCOMPRESSED + envelope
 
-    # 2. Generate salt dan nonce acak untuk setiap enkripsi
+    # 3. Parameter acak kriptografi
     salt = os.urandom(SALT_SIZE)
     nonce = os.urandom(NONCE_SIZE)
-    
-    # 3. Turunkan kunci simetris 256-bit dari password
     key = derive_key(password, salt)
-    
-    # 4. Enkripsi pesan dengan AES-GCM (otomatis menyertakan 16 byte Auth Tag di akhir)
+
+    # 4. Enkripsi AES-256-GCM
     aesgcm = AESGCM(key)
     ciphertext_with_tag = aesgcm.encrypt(nonce, body, None)
-    
-    # 5. Gabungkan menjadi satu kesatuan payload bytes
     return salt + nonce + ciphertext_with_tag
 
 
-def decrypt_message(payload: bytes, password: str) -> str:
+def decrypt_payload_data(payload: bytes, password: str) -> Dict[str, Any]:
     """
-    Mendekripsi payload terenkripsi menggunakan AES-256-GCM
-    lalu mendekompresi payload jika dikompresi.
+    Mendekripsi payload terenkripsi menggunakan AES-256-GCM,
+    mendekompresi zlib, lalu mendeteksi apakah isinya Teks atau Berkas Biner.
     
-    Raises:
-        ValueError: Jika password salah atau data bit rusak/termodifikasi.
+    Returns:
+        Dict:
+          {"type": "text", "text": str, "size": int}
+          or
+          {"type": "file", "filename": str, "data": bytes, "size": int}
     """
-    min_length = SALT_SIZE + NONCE_SIZE + 16  # Minimal harus ada salt + nonce + tag
+    min_length = SALT_SIZE + NONCE_SIZE + 16
     if len(payload) < min_length:
         raise ValueError("Payload terenkripsi terlalu pendek atau tidak valid.")
         
-    # 1. Pecah payload sesuai strukturnya
     salt = payload[:SALT_SIZE]
     nonce = payload[SALT_SIZE:SALT_SIZE + NONCE_SIZE]
     ciphertext_with_tag = payload[SALT_SIZE + NONCE_SIZE:]
     
-    # 2. Turunkan kunci menggunakan salt yang sama
     key = derive_key(password, salt)
-    
-    # 3. Dekripsi dan verifikasi keaslian (Auth Tag)
     aesgcm = AESGCM(key)
     try:
         decrypted_body = aesgcm.decrypt(nonce, ciphertext_with_tag, None)
     except InvalidTag:
         raise ValueError("Dekripsi GAGAL: Stego-key salah atau data telah dimanipulasi!")
 
-    # 4. Cek flag kompresi
+    # 1. Cek flag kompresi
     flag = decrypted_body[:1]
-    data = decrypted_body[1:]
+    raw_envelope = decrypted_body[1:]
 
     if flag == FLAG_ZLIB_COMPRESSED:
         try:
-            decompressed = zlib.decompress(data)
-            return decompressed.decode("utf-8")
+            envelope = zlib.decompress(raw_envelope)
         except Exception:
-            raise ValueError("Dekripsi GAGAL: Dekompresi data korup.")
+            raise ValueError("Dekripsi GAGAL: Dekompresi zlib gagal/data rusak.")
     elif flag == FLAG_UNCOMPRESSED:
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError:
-            raise ValueError("Dekripsi GAGAL: Data hasil dekripsi bukan teks UTF-8 yang valid.")
+        envelope = raw_envelope
     else:
-        # Fallback kompatibilitas jika payload lama tanpa header flag
+        envelope = decrypted_body
+
+    # 2. Cek tipe isi envelope (Teks atau Berkas)
+    type_tag = envelope[:1]
+    if type_tag == TAG_TYPE_FILE:
+        fn_len = envelope[1]
+        filename = envelope[2:2 + fn_len].decode("utf-8", errors="replace")
+        file_data = envelope[2 + fn_len:]
+        return {
+            "type": "file",
+            "filename": filename,
+            "data": file_data,
+            "size": len(file_data)
+        }
+    elif type_tag == TAG_TYPE_TEXT:
+        text = envelope[1:].decode("utf-8", errors="replace")
+        return {
+            "type": "text",
+            "text": text,
+            "size": len(envelope) - 1
+        }
+    else:
+        # Fallback kompatibilitas versi awal
         try:
-            return decrypted_body.decode("utf-8")
+            return {
+                "type": "text",
+                "text": envelope.decode("utf-8"),
+                "size": len(envelope)
+            }
         except UnicodeDecodeError:
             raise ValueError("Dekripsi GAGAL: Format payload tidak dikenali.")
+
+
+def encrypt_message(plaintext: str, password: str) -> bytes:
+    """Wrapper untuk enkripsi teks string (kompatibilitas mundur)."""
+    return encrypt_payload_data(plaintext.encode("utf-8"), data_type="text", filename="", password=password)
+
+
+def decrypt_message(payload: bytes, password: str) -> str:
+    """Wrapper untuk dekripsi teks string (kompatibilitas mundur)."""
+    res = decrypt_payload_data(payload, password)
+    if res["type"] == "text":
+        return res["text"]
+    return f"[Berkas Terlampir: {res['filename']} ({res['size']} byte)]"
