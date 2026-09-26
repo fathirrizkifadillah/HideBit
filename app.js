@@ -13,12 +13,15 @@ const state = {
   coverFile: null,
   stegoFile: null,
   analysisFile: null,
+  referenceFile: null,
   secretFile: null,
   coverUrl: null,
   stegoDataUrl: null,
   capacityBytes: 0,
   payloadMode: "text", // "text" | "file"
+  analysisMode: "blind", // "blind" | "compare"
   revealedBlobUrl: null,
+  lastAnalysisReport: null,
 };
 
 function setRoute(route) {
@@ -197,6 +200,55 @@ const analysisPicker = setupImagePicker({
   cancelBtnId: "analysisCancelBtn",
   kind: "analysis",
 });
+
+const referencePicker = setupImagePicker({
+  inputId: "referenceInput",
+  dropId: "referenceDrop",
+  cardId: "referenceCard",
+  thumbId: "referenceThumbImg",
+  metaId: "referenceMeta",
+  cancelBtnId: "referenceCancelBtn",
+  kind: "reference",
+});
+
+// Setup Analysis Mode Switcher Tabs
+function setupAnalysisModeTabs() {
+  const tabBlind = document.getElementById("tabModeBlind");
+  const tabCompare = document.getElementById("tabModeCompare");
+  const refSection = document.getElementById("referenceSection");
+  const uploadTitle = document.getElementById("analysisUploadTitle");
+  const uploadSub = document.getElementById("analysisUploadSub");
+  const dropLabel = document.getElementById("analysisDropLabel");
+  const btnText = document.getElementById("analyzeBtnText");
+  const compareMetricsPanel = document.getElementById("compareMetricsPanel");
+
+  if (!tabBlind || !tabCompare) return;
+
+  tabBlind.addEventListener("click", () => {
+    state.analysisMode = "blind";
+    tabBlind.classList.add("active");
+    tabCompare.classList.remove("active");
+    if (refSection) refSection.classList.add("hidden");
+    if (uploadTitle) uploadTitle.textContent = "Citra untuk Dianalisis";
+    if (uploadSub) uploadSub.textContent = "Unggah citra lossless (PNG, BMP, WEBP) untuk inspeksi anomali bit LSB.";
+    if (dropLabel) dropLabel.textContent = "Upload Citra Uji";
+    if (btnText) btnText.textContent = "Jalankan Analisis Forensik";
+    if (compareMetricsPanel) compareMetricsPanel.classList.add("hidden");
+  });
+
+  tabCompare.addEventListener("click", () => {
+    state.analysisMode = "compare";
+    tabCompare.classList.add("active");
+    tabBlind.classList.remove("active");
+    if (refSection) refSection.classList.remove("hidden");
+    if (uploadTitle) uploadTitle.textContent = "Citra Stego (Uji Forensik)";
+    if (uploadSub) uploadSub.textContent = "Unggah citra stego yang dicurigai membawa payload tersembunyi.";
+    if (dropLabel) dropLabel.textContent = "Upload Citra Stego";
+    if (btnText) btnText.textContent = "Bandingkan Citra Asli vs Stego";
+  });
+}
+setupAnalysisModeTabs();
+
 
 // Setup Secret File Picker
 function setupSecretFilePicker() {
@@ -540,14 +592,22 @@ async function handleSteganalysis() {
     return;
   }
 
+  if (state.analysisMode === "compare" && !state.referenceFile) {
+    alert("Dalam Mode Komparasi, berkas Citra Referensi Asli (Cover) wajib diunggah.");
+    return;
+  }
+
   const analyzeBtn = document.getElementById("analyzeButton");
   const stateLabel = document.getElementById("analysisState");
   analyzeBtn.disabled = true;
-  stateLabel.textContent = "Analyzing statistical patterns...";
+  stateLabel.textContent = "Menganalisis anomali statistik...";
 
   try {
     const formData = new FormData();
     formData.append("image", state.analysisFile);
+    if (state.analysisMode === "compare" && state.referenceFile) {
+      formData.append("reference", state.referenceFile);
+    }
 
     const res = await fetch("/api/analyze", {
       method: "POST",
@@ -558,17 +618,74 @@ async function handleSteganalysis() {
 
     if (!data.success) {
       alert("Analisis gagal: " + (data.error || "Unknown error"));
-      stateLabel.textContent = "Analysis failed";
+      stateLabel.textContent = "Analisis gagal";
       return;
     }
 
     // 1. Update Skor Kecurigaan (0 - 100)
     const score = Number(data.score) || 0;
     document.getElementById("scoreValue").textContent = score.toFixed(2);
-    document.getElementById("scoreRing").style.background = `conic-gradient(var(--teal) ${score * 3.6}deg, #344142 0deg)`;
-    stateLabel.textContent = "Analysis complete";
+    
+    // Gradien dinamis sesuai level kecurigaan
+    let ringColor = "var(--teal)";
+    if (score >= 65) ringColor = "var(--red)";
+    else if (score >= 35) ringColor = "var(--yellow)";
+    document.getElementById("scoreRing").style.background = `conic-gradient(${ringColor} ${score * 3.6}deg, #344142 0deg)`;
+    stateLabel.textContent = "Analisis selesai";
 
-    // 2. Update Tabel Chi-Square per kanal
+    // 2. Render Vonis Forensik Komprehensif
+    const verdict = data.verdict || {};
+    const verdictCard = document.getElementById("forensicVerdictCard");
+    const verdictBanner = document.getElementById("verdictBanner");
+    const verdictBadge = document.getElementById("verdictBadge");
+    const verdictTitle = document.getElementById("verdictTitle");
+    const verdictNarrative = document.getElementById("verdictNarrative");
+    const verdictAdvice = document.getElementById("verdictAdvice");
+    const verdictRevealLink = document.getElementById("verdictRevealLink");
+
+    if (verdictCard && verdictBanner) {
+      verdictCard.classList.remove("hidden");
+      verdictBanner.className = "verdict-banner " + (
+        verdict.level === "CLEAN" ? "clean" :
+        (verdict.level === "SUSPICIOUS" ? "suspicious" : "anomaly")
+      );
+      if (verdictBadge) verdictBadge.textContent = verdict.badge_label || "STATUS FORENSIK";
+      if (verdictTitle) verdictTitle.textContent = verdict.title || "Hasil Pemeriksaan Forensik";
+      if (verdictNarrative) verdictNarrative.textContent = verdict.narrative || "";
+      if (verdictAdvice) verdictAdvice.textContent = verdict.recommendation || "";
+      
+      if (verdictRevealLink) {
+        if (verdict.level === "ANOMALY_DETECTED" || score >= 65) {
+          verdictRevealLink.classList.remove("hidden");
+        } else {
+          verdictRevealLink.classList.add("hidden");
+        }
+      }
+    }
+
+    // 3. Render Komparasi Citra (Jika Mode Komparasi Aktif)
+    const compPanel = document.getElementById("compareMetricsPanel");
+    if (data.comparison && data.comparison.has_reference) {
+      if (compPanel) compPanel.classList.remove("hidden");
+      const m = data.comparison.metrics || {};
+      const psnrEl = document.getElementById("compPsnr");
+      const mseEl = document.getElementById("compMse");
+      const pixEl = document.getElementById("compPixels");
+      const pixPctEl = document.getElementById("compPixelPercent");
+      const heatWrap = document.getElementById("compHeatmapWrap");
+
+      if (psnrEl) psnrEl.textContent = `${m.psnr_db ?? "--"} dB`;
+      if (mseEl) mseEl.textContent = `${m.mse ?? "--"}`;
+      if (pixEl) pixEl.textContent = `${(m.changed_pixels || 0).toLocaleString()} piksel`;
+      if (pixPctEl) pixPctEl.textContent = `${m.pixel_change_percent ?? 0}% dari resolusi citra`;
+      if (heatWrap && data.comparison.difference_map) {
+        heatWrap.innerHTML = `<img src="${data.comparison.difference_map}" alt="Difference Heatmap">`;
+      }
+    } else {
+      if (compPanel) compPanel.classList.add("hidden");
+    }
+
+    // 4. Update Tabel Chi-Square per kanal (dengan Status Anomali)
     const ch = data.channels || {};
     const rows = [
       ["red", "Red", ch.red?.chi_square, ch.red?.degrees_of_freedom, ch.red?.p_value],
@@ -580,10 +697,26 @@ async function handleSteganalysis() {
       const chiStr = typeof chi === "number" ? chi.toFixed(2) : "--";
       const dofStr = dof !== undefined ? dof : "--";
       const pStr = typeof p === "number" ? p.toFixed(4) : "--";
-      return `<tr><td><i class="channel-dot ${color}"></i> ${name}</td><td>${chiStr}</td><td>${dofStr}</td><td>${pStr}</td></tr>`;
+      
+      let statusBadge = '<span class="status-pill safe">Normal</span>';
+      if (typeof p === "number") {
+        if (p >= 0.85) {
+          statusBadge = '<span class="status-pill danger">Anomali</span>';
+        } else if (p >= 0.45) {
+          statusBadge = '<span class="status-pill warn">Moderat</span>';
+        }
+      }
+
+      return `<tr>
+        <td><i class="channel-dot ${color}"></i> ${name}</td>
+        <td>${chiStr}</td>
+        <td>${dofStr}</td>
+        <td>${pStr}</td>
+        <td>${statusBadge}</td>
+      </tr>`;
     }).join("");
 
-    // 3. Render Visual LSB Planes
+    // 5. Render Visual LSB Planes
     if (data.lsb_planes) {
       const rEl = document.getElementById("lsbRed");
       const gEl = document.getElementById("lsbGreen");
@@ -593,13 +726,100 @@ async function handleSteganalysis() {
       if (bEl && data.lsb_planes.blue) bEl.innerHTML = `<img src="${data.lsb_planes.blue}" alt="Blue LSB Plane">`;
     }
 
+    // Simpan objek laporan untuk ekspor berkas .txt
+    state.lastAnalysisReport = {
+      timestamp: new Date().toLocaleString("id-ID"),
+      fileName: state.analysisFile.name,
+      fileSize: formatBytes(state.analysisFile.size),
+      mode: state.analysisMode === "compare" ? "Dual Comparative Analysis (Cover vs Stego)" : "Blind Steganalysis (Single Image)",
+      score: score,
+      verdict: verdict,
+      channels: ch,
+      comparison: data.comparison || null,
+      refName: state.referenceFile ? state.referenceFile.name : null
+    };
+
+    if (verdictCard) verdictCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
   } catch (err) {
     alert("Gagal melakukan analisis steganalisis: " + err.message);
-    stateLabel.textContent = "Error occurred";
+    stateLabel.textContent = "Terjadi kesalahan";
   } finally {
     analyzeBtn.disabled = false;
   }
 }
+
+function downloadForensicReport() {
+  if (!state.lastAnalysisReport) {
+    alert("Jalankan analisis citra terlebih dahulu sebelum mengunduh laporan.");
+    return;
+  }
+
+  const r = state.lastAnalysisReport;
+  const ch = r.channels || {};
+
+  let compSection = "";
+  if (r.comparison && r.comparison.has_reference) {
+    const m = r.comparison.metrics || {};
+    compSection = `
+========================================================================
+  KOMPARASI KUALITAS CITRA (COVER VS STEGO)
+========================================================================
+- Citra Referensi Cover : ${r.refName || "Cover Image"}
+- PSNR (Peak Signal)    : ${m.psnr_db ?? "--"} dB
+- MSE (Mean Squared)    : ${m.mse ?? "--"}
+- Piksel Dimodifikasi   : ${(m.changed_pixels || 0).toLocaleString()} (${m.pixel_change_percent ?? 0}%)
+- Piksel Utuh           : ${(m.unchanged_pixels || 0).toLocaleString()} (${m.unchanged_percent ?? 100}%)
+`;
+  }
+
+  const reportContent = `========================================================================
+  LAPORAN AUDIT STEGANALISIS FORENSIK CITRA - HIDEBIT
+========================================================================
+Tanggal & Waktu Pemeriksaan : ${r.timestamp}
+Metode Pengujian             : ${r.mode}
+Nama Berkas Citra Uji       : ${r.fileName} (${r.fileSize})
+
+------------------------------------------------------------------------
+HASIL DIAGNOSIS FORENSIK:
+------------------------------------------------------------------------
+Skor Kecurigaan Heuristik   : ${r.score.toFixed(2)} / 100
+Vonis Pemeriksaan           : ${r.verdict.badge_label || "--"}
+Judul Diagnosis             : ${r.verdict.title || "--"}
+
+Narasi Forensik:
+${r.verdict.narrative || "--"}
+
+Rekomendasi Tindakan:
+${r.verdict.recommendation || "--"}
+
+------------------------------------------------------------------------
+PROFIL STATISTIK PASANGAN NILAI (PoV) CHI-SQUARE:
+------------------------------------------------------------------------
+Kanal Red   : Chi2 = ${ch.red?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.red?.degrees_of_freedom ?? "--"}, p-value = ${ch.red?.p_value?.toFixed(4) ?? "--"}
+Kanal Green : Chi2 = ${ch.green?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.green?.degrees_of_freedom ?? "--"}, p-value = ${ch.green?.p_value?.toFixed(4) ?? "--"}
+Kanal Blue  : Chi2 = ${ch.blue?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.blue?.degrees_of_freedom ?? "--"}, p-value = ${ch.blue?.p_value?.toFixed(4) ?? "--"}
+
+Keterangan Ilmiah:
+Substitusi bit LSB secara acak (misal ciphertext AES-256) memaksakan
+kesetimbangan frekuensi nilai piksel genap (2k) dan ganjil (2k+1).
+Kanal dengan p-value mendekati 1.00 mengindikasikan anomali manipulasi LSB.
+${compSection}
+========================================================================
+  Diverifikasi oleh Engine Forensik HideBit - Keamanan Informasi & Kriptografi
+========================================================================`;
+
+  const blob = new Blob([reportContent], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `laporan-forensik-${r.fileName.replace(/\.[^/.]+$/, "")}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 
 // Download berkas citra stego asli
 document.getElementById("downloadButton").addEventListener("click", () => {
@@ -639,6 +859,8 @@ document.getElementById("revealAnother").addEventListener("click", () => {
   stegoPicker.clearSelection();
 });
 document.getElementById("analyzeButton").addEventListener("click", handleSteganalysis);
+const exportBtn = document.getElementById("exportReportBtn");
+if (exportBtn) exportBtn.addEventListener("click", downloadForensicReport);
 
 document.getElementById("copyButton").addEventListener("click", async (event) => {
   try {

@@ -78,4 +78,55 @@
 .diff-stats-note{margin:14px 0 0 0;padding-top:12px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);line-height:1.5}
 .diff-stats-note b{color:var(--ink)}
 .diff-stats-note span{font-weight:700;color:var(--teal-dark)}
+
+/* Analysis Mode Selector */
+.analysis-mode-selector{display:flex;gap:8px;margin-bottom:22px;background:#edf2f1;padding:5px;border-radius:10px;border:1px solid var(--line);max-width:520px}
+.analysis-mode-tab{flex:1;padding:10px 16px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s ease;text-align:center}
+.analysis-mode-tab:hover{color:var(--ink)}
+.analysis-mode-tab.active{background:#fff;color:var(--teal-dark);font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+
+/* Reference Image Upload Section */
+.reference-section{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+.reference-header{margin-bottom:10px}
+.ref-kicker{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--teal-dark);text-transform:uppercase}
+.reference-header p{margin:3px 0 0 0;font-size:12px;color:var(--muted)}
+
+/* Forensic Verdict Card */
+.forensic-verdict-card{margin-top:24px;border-radius:14px;overflow:hidden;padding:0!important;border:1px solid var(--line);box-shadow:var(--shadow)}
+.verdict-banner{padding:26px 30px;transition:background .2s ease}
+.verdict-banner.clean{background:linear-gradient(145deg,#f0fdf9,#e6f7f3);border-left:6px solid #10b981}
+.verdict-banner.suspicious{background:linear-gradient(145deg,#fffbeb,#fef3c7);border-left:6px solid #f59e0b}
+.verdict-banner.anomaly{background:linear-gradient(145deg,#fff1f2,#ffe4e6);border-left:6px solid #ef4444}
+.verdict-badge-wrap{margin-bottom:10px}
+.verdict-pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 12px;border-radius:20px}
+.verdict-banner.clean .verdict-pill{background:#d1fae5;color:#065f46}
+.verdict-banner.suspicious .verdict-pill{background:#fde68a;color:#92400e}
+.verdict-banner.anomaly .verdict-pill{background:#fecdd3;color:#9f1239}
+.verdict-banner h3{font-size:22px;margin:0 0 8px 0;color:var(--ink);font-family:"Space Grotesk",sans-serif}
+.verdict-banner p{margin:0 0 16px 0;color:#4b5563;font-size:14px;line-height:1.6;max-width:860px}
+.verdict-advice-box{background:rgba(255,255,255,0.7);border:1px solid rgba(0,0,0,0.07);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--ink);margin-bottom:18px;line-height:1.5}
+.verdict-advice-box b{color:var(--ink);margin-right:6px}
+.verdict-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+/* Channel Status Badges in Table */
+.status-pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:4px}
+.status-pill.safe{background:#dcfce7;color:#166534}
+.status-pill.warn{background:#fef3c7;color:#92400e}
+.status-pill.danger{background:#fee2e2;color:#991b1b}
+
+/* Compare Metrics Panel */
+.compare-metrics-panel{margin-top:24px}
+.compare-grid{display:grid;grid-template-columns:repeat(3,1fr) 1.5fr;gap:16px;margin-top:18px}
+@media(max-width:900px){.compare-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.compare-grid{grid-template-columns:1fr}}
+.compare-metric-card{padding:16px;background:#fbfdfc;border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;gap:4px}
+.compare-metric-card.highlight{background:#f0fdf9;border-color:var(--teal)}
+.compare-metric-card .label{font-size:11px;color:var(--muted);font-weight:600}
+.compare-metric-card strong{font-size:22px;font-family:"Space Grotesk",sans-serif;color:var(--ink)}
+.compare-metric-card.highlight strong{color:var(--teal-dark)}
+.compare-metric-card small{font-size:11px;color:#7b8886;line-height:1.4}
+.compare-heatmap-card{padding:16px;background:#fbfdfc;border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;gap:8px}
+.compare-heatmap-card .label{font-size:11px;color:var(--muted);font-weight:600}
+.heatmap-img-wrap{height:120px;background:#0e1315;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:4px}
+.heatmap-img-wrap img{max-width:100%;max-height:100%;object-fit:contain}
 

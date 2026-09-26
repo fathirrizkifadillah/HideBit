@@ -26,7 +26,210 @@
 
     <section class="view" data-view="reveal"><div class="page-heading"><div><p class="eyebrow">DECODER / 02 <span></span></p><h2>Reveal Your Message</h2><p>Ekstrak dan dekripsi pesan atau berkas rahasia dari citra stego.</p></div></div><div class="workspace-grid reveal-grid"><div class="form-stack"><article class="panel"><div class="section-title"><span class="step-number">01</span><div><h3>Stego Image</h3><p>Unggah citra yang telah diproses oleh HideBit.</p></div></div><label class="upload-zone compact" id="stegoDrop"><input id="stegoInput" type="file" accept="image/png,image/jpeg,image/bmp,image/webp,.png,.jpg,.jpeg,.bmp,.webp"><span class="upload-icon">+</span><strong>Upload Stego Image</strong><small>PNG, BMP, JPG, WEBP</small><button class="button secondary" type="button">Pilih Gambar</button></label><div id="stegoCard" class="selected-card hidden"><div class="selected-thumb-wrap"><img id="stegoThumbImg" src="" alt="Stego thumbnail preview"></div><div class="selected-info"><div id="stegoMeta" class="file-meta-content"></div><div class="selected-btn-group"><label class="button secondary btn-sm" for="stegoInput">Ganti Gambar</label><button class="button danger btn-sm" id="stegoCancelBtn" type="button">Hapus</button></div></div></div></article><article class="panel"><div class="section-title"><span class="step-number">02</span><div><h3>Stego Key</h3><p>Kunci yang sama saat proses embedding dilakukan.</p></div></div><div class="password-field"><input id="revealKey" type="password" placeholder="Masukkan stego key"><button type="button" class="icon-button" data-toggle-password="revealKey" aria-label="Show stego key">Show</button></div><p class="helper">Kunci bersifat privat dan diproses secara aman.</p></article><button class="button primary wide" id="revealButton" type="button">Ekstrak Payload <span>-></span></button></div><aside class="side-note quiet"><div class="key-illustration">KEY</div><h3>Kunci Membuka Citra.</h3><p>Ekstraksi meregenerasi urutan PRNG yang sama persis. Kunci yang salah atau citra yang rusak akan otomatis ditolak oleh autentikasi AES-GCM.</p></aside></div><div class="success-card hidden" id="revealResult"><div class="success-card-head"><span class="success-mark">OK</span><div><p class="eyebrow">AUTHENTICATED PAYLOAD <span></span></p><h2 id="revealResultHeading">Payload Terbaca</h2><p id="revealResultSub">Data rahasia Anda berhasil diekstrak dan diverifikasi otentik.</p></div></div><div class="message-box" id="revealedTextBox"><span>Secret Message</span><p id="revealedText">Hello! This is a secret message that was successfully hidden.</p></div><div class="reveal-file-card hidden" id="revealedFileCard"><div class="reveal-file-icon-wrap"><span class="reveal-file-badge" id="revealedFileBadge">FILE</span></div><div class="reveal-file-info"><span class="reveal-kicker">BERKAS RAHASIA TERDEKRIPSI</span><h4 id="revealedFileName">nama_berkas.ext</h4><small id="revealedFileSize">-- KB</small></div><a class="button primary download-doc-btn" id="downloadRevealedFileBtn" href="#" download>Unduh Berkas</a></div><div class="button-row"><button class="button primary" id="copyButton" type="button">Salin Pesan</button><button class="button secondary" id="revealAnother" type="button">Ekstrak Lagi</button></div></div><div class="error-banner hidden" id="revealError"><strong>Dekripsi Gagal</strong><span>Stego-key salah atau citra tidak mengandung pesan rahasia HideBit.</span><small>Decryption failed: Stego-key may be incorrect or the data may have been modified.</small></div><div class="notice reveal-notice"><span class="notice-symbol">i</span><p><strong>Lindungi Kunci Anda</strong> Tanpa stego-key yang sesuai, isi payload tidak dapat didekripsi.</p></div></section>
 
-    <section class="view" data-view="analysis"><div class="page-heading"><div><p class="eyebrow">DETECTOR / 03 <span></span></p><h2>Steganalysis</h2><p>Deteksi anomali statistik citra terhadap manipulasi LSB.</p></div></div><div class="analysis-layout"><article class="panel analysis-upload"><div class="section-title"><span class="step-number">01</span><div><h3>Image to Analyze</h3><p>Gunakan citra berformat lossless untuk sinyal yang akurat.</p></div></div><label class="upload-zone compact" id="analysisDrop"><input id="analysisInput" type="file" accept="image/png,image/jpeg,image/bmp,image/webp,.png,.jpg,.jpeg,.bmp,.webp"><span class="upload-icon">+</span><strong>Upload Image</strong><small>PNG, JPG, BMP, WEBP</small><button class="button secondary" type="button">Pilih Gambar</button></label><div id="analysisCard" class="selected-card hidden"><div class="selected-thumb-wrap"><img id="analysisThumbImg" src="" alt="Analysis thumbnail preview"></div><div class="selected-info"><div id="analysisMeta" class="file-meta-content"></div><div class="selected-btn-group"><label class="button secondary btn-sm" for="analysisInput">Ganti Gambar</label><button class="button danger btn-sm" id="analysisCancelBtn" type="button">Hapus</button></div></div></div><button class="button primary wide" id="analyzeButton" type="button">Analisis Citra <span>-></span></button></article><article class="score-card"><div class="score-card-head"><div><p class="eyebrow">RESULT <span></span></p><h3>Heuristic Suspicion Score</h3></div><span class="info-dot">i</span></div><div class="score-ring" id="scoreRing"><div><strong id="scoreValue">--</strong><span>/ 100</span></div></div><p class="score-caption">Skor merupakan indikator heuristik Chi-Square PoV dan tidak menjamin keberadaan data rahasia secara mutlak.</p><div class="score-scale"><span>Kecurigaan Rendah</span><span>Kecurigaan Tinggi</span></div></article></div><article class="panel table-panel"><div class="table-heading"><div><p class="eyebrow">CHANNEL ANALYSIS <span></span></p><h3>Profil Statistik Pasangan Nilai (PoV) RGB</h3></div><span class="analysis-state" id="analysisState">Menunggu citra</span></div><div class="table-wrap"><table><thead><tr><th>Kanal Warna</th><th>Chi-Square</th><th>Degrees of Freedom</th><th>P-Value</th></tr></thead><tbody id="channelRows"><tr><td><i class="channel-dot red"></i> Red</td><td>--</td><td>--</td><td>--</td></tr><tr><td><i class="channel-dot green"></i> Green</td><td>--</td><td>--</td><td>--</td></tr><tr><td><i class="channel-dot blue"></i> Blue</td><td>--</td><td>--</td><td>--</td></tr></tbody></table></div><div class="interpretation"><span>i</span><p><b>Interpretasi Statistik:</b> Nilai p-value yang tinggi menandakan frekuensi pasangan nilai piksel (Pairs of Values) sangat seimbang, yang merupakan ciri khas substitusi LSB.</p></div></article><article class="panel table-panel lsb-panel"><div class="table-heading"><div><p class="eyebrow">VISUAL STEGANALYSIS <span></span></p><h3>Inspeksi Visual Bidang LSB (Bit-0)</h3></div></div><p class="lsb-desc">Ekstraksi bit LSB (bit-0) dari tiap kanal warna. Citra asli tampak seperti noise acak alami. Penyisipan LSB teracak PRNG menyebar secara merata di seluruh bidang citra.</p><div class="lsb-grid"><div class="lsb-card"><div class="lsb-img" id="lsbRed"><span>Red LSB</span></div><span>Kanal Merah (R)</span></div><div class="lsb-card"><div class="lsb-img" id="lsbGreen"><span>Green LSB</span></div><span>Kanal Hijau (G)</span></div><div class="lsb-card"><div class="lsb-img" id="lsbBlue"><span>Blue LSB</span></div><span>Kanal Biru (B)</span></div></div></article></section>
+    <section class="view" data-view="analysis">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">DETECTOR / 03 <span></span></p>
+          <h2>Steganalysis</h2>
+          <p>Uji forensik statistik Chi-Square PoV dan inspeksi visual manipulasi LSB.</p>
+        </div>
+      </div>
+
+      <div class="analysis-mode-selector">
+        <button class="analysis-mode-tab active" id="tabModeBlind" type="button">Mode Mandiri (Blind Detection)</button>
+        <button class="analysis-mode-tab" id="tabModeCompare" type="button">Mode Komparasi (Cover vs Stego)</button>
+      </div>
+
+      <div class="analysis-layout">
+        <article class="panel analysis-upload">
+          <div class="section-title">
+            <span class="step-number">01</span>
+            <div>
+              <h3 id="analysisUploadTitle">Citra untuk Dianalisis</h3>
+              <p id="analysisUploadSub">Unggah citra lossless (PNG, BMP, WEBP) untuk inspeksi anomali bit LSB.</p>
+            </div>
+          </div>
+
+          <label class="upload-zone compact" id="analysisDrop">
+            <input id="analysisInput" type="file" accept="image/png,image/jpeg,image/bmp,image/webp,.png,.jpg,.jpeg,.bmp,.webp">
+            <span class="upload-icon">+</span>
+            <strong id="analysisDropLabel">Upload Citra Uji</strong>
+            <small>PNG, BMP, JPG, WEBP</small>
+            <button class="button secondary" type="button">Pilih Gambar</button>
+          </label>
+          <div id="analysisCard" class="selected-card hidden">
+            <div class="selected-thumb-wrap">
+              <img id="analysisThumbImg" src="" alt="Analysis thumbnail preview">
+            </div>
+            <div class="selected-info">
+              <div id="analysisMeta" class="file-meta-content"></div>
+              <div class="selected-btn-group">
+                <label class="button secondary btn-sm" for="analysisInput">Ganti</label>
+                <button class="button danger btn-sm" id="analysisCancelBtn" type="button">Hapus</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="referenceSection" class="reference-section hidden">
+            <div class="reference-header">
+              <span class="ref-kicker">CITRA REFERENSI ASLI (COVER)</span>
+              <p>Diperlukan untuk komparasi langsung, kalkulasi PSNR, MSE, & heatmap selisih.</p>
+            </div>
+            <label class="upload-zone compact" id="referenceDrop">
+              <input id="referenceInput" type="file" accept="image/png,image/jpeg,image/bmp,image/webp,.png,.jpg,.jpeg,.bmp,.webp">
+              <span class="upload-icon">+</span>
+              <strong>Upload Citra Asli (Cover)</strong>
+              <small>Dimensi resolusi harus identik dengan citra uji</small>
+              <button class="button secondary" type="button">Pilih Cover Asli</button>
+            </label>
+            <div id="referenceCard" class="selected-card hidden">
+              <div class="selected-thumb-wrap">
+                <img id="referenceThumbImg" src="" alt="Reference thumbnail preview">
+              </div>
+              <div class="selected-info">
+                <div id="referenceMeta" class="file-meta-content"></div>
+                <div class="selected-btn-group">
+                  <label class="button secondary btn-sm" for="referenceInput">Ganti</label>
+                  <button class="button danger btn-sm" id="referenceCancelBtn" type="button">Hapus</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="button primary wide" id="analyzeButton" type="button">
+            <span id="analyzeBtnText">Jalankan Analisis Forensik</span> <span>-></span>
+          </button>
+        </article>
+
+        <article class="score-card">
+          <div class="score-card-head">
+            <div>
+              <p class="eyebrow">RESULT <span></span></p>
+              <h3>Heuristic Suspicion Score</h3>
+            </div>
+            <span class="info-dot">i</span>
+          </div>
+          <div class="score-ring" id="scoreRing">
+            <div>
+              <strong id="scoreValue">--</strong>
+              <span>/ 100</span>
+            </div>
+          </div>
+          <p class="score-caption" id="scoreCaption">Skor merupakan indikator heuristik Chi-Square PoV. Nilai tinggi menandakan ketidakwajaran kesetimbangan pasangan piksel genap/ganjil.</p>
+          <div class="score-scale">
+            <span>Kecurigaan Rendah (Alami)</span>
+            <span>Kecurigaan Tinggi (Stego)</span>
+          </div>
+        </article>
+      </div>
+
+      <article class="panel forensic-verdict-card hidden" id="forensicVerdictCard">
+        <div class="verdict-banner clean" id="verdictBanner">
+          <div class="verdict-badge-wrap">
+            <span class="verdict-pill" id="verdictBadge">STATUS PEMERIKSAAN</span>
+          </div>
+          <h3 id="verdictTitle">Hasil Analisis Forensik</h3>
+          <p id="verdictNarrative">Unggah citra dan klik tombol analisis untuk memperoleh diagnosis statistik forensik.</p>
+          <div class="verdict-advice-box">
+            <b>Rekomendasi Forensik:</b>
+            <span id="verdictAdvice">--</span>
+          </div>
+          <div class="verdict-actions">
+            <button class="button secondary btn-sm" id="exportReportBtn" type="button">Unduh Laporan Forensik (.txt)</button>
+            <a class="button primary btn-sm hidden" id="verdictRevealLink" href="#reveal">Uji Ekstraksi di Reveal</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel compare-metrics-panel hidden" id="compareMetricsPanel">
+        <div class="table-heading">
+          <div>
+            <p class="eyebrow">COMPARATIVE QUALITY METRICS <span></span></p>
+            <h3>Hasil Evaluasi Citra Asli vs Stego</h3>
+          </div>
+          <span class="vbadge success" id="compareFidelityTag">Fidelity Evaluated</span>
+        </div>
+        <div class="compare-grid">
+          <div class="compare-metric-card highlight">
+            <span class="label">PSNR (Signal-to-Noise)</span>
+            <strong id="compPsnr">-- dB</strong>
+            <small>Semakin tinggi (>40 dB), semakin sempurna ketidaktampakannya.</small>
+          </div>
+          <div class="compare-metric-card">
+            <span class="label">MSE (Mean Squared Error)</span>
+            <strong id="compMse">--</strong>
+            <small>Tingkat penyimpangan rata-rata per nilai piksel.</small>
+          </div>
+          <div class="compare-metric-card">
+            <span class="label">Piksel Dimodifikasi</span>
+            <strong id="compPixels">--</strong>
+            <small id="compPixelPercent">--% dari total resolusi</small>
+          </div>
+          <div class="compare-heatmap-card">
+            <span class="label">Peta Sebaran Bit Berubah (Difference Heatmap)</span>
+            <div class="heatmap-img-wrap" id="compHeatmapWrap">
+              <span class="placeholder-text">Menunggu komparasi...</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel table-panel">
+        <div class="table-heading">
+          <div>
+            <p class="eyebrow">CHANNEL ANALYSIS <span></span></p>
+            <h3 id="channelTableTitle">Profil Statistik Pasangan Nilai (PoV) RGB</h3>
+          </div>
+          <span class="analysis-state" id="analysisState">Menunggu citra</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr id="tableHeaderRow">
+                <th>Kanal Warna</th>
+                <th>Chi-Square</th>
+                <th>Degrees of Freedom</th>
+                <th>P-Value</th>
+                <th>Status Anomali</th>
+              </tr>
+            </thead>
+            <tbody id="channelRows">
+              <tr><td><i class="channel-dot red"></i> Red</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+              <tr><td><i class="channel-dot green"></i> Green</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+              <tr><td><i class="channel-dot blue"></i> Blue</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="interpretation">
+          <span>i</span>
+          <p><b>Interpretasi Statistik:</b> Nilai p-value mendekati 1.00 menandakan frekuensi pasangan nilai piksel (Pairs of Values) sangat seimbang akibat substitusi bit ciphertext secara acak, yang merupakan ciri khas manipulasi LSB.</p>
+        </div>
+      </article>
+
+      <article class="panel table-panel lsb-panel">
+        <div class="table-heading">
+          <div>
+            <p class="eyebrow">VISUAL STEGANALYSIS <span></span></p>
+            <h3>Inspeksi Visual Bidang LSB (Bit-0)</h3>
+          </div>
+        </div>
+        <p class="lsb-desc">Ekstraksi bit LSB (bit-0) dari tiap kanal warna. Citra asli biasanya masih menampakkan siluet kontur objek, sedangkan area yang disisipi enkripsi AES akan tampak seperti noise statis acak (bintik semut).</p>
+        <div class="lsb-grid">
+          <div class="lsb-card">
+            <div class="lsb-img" id="lsbRed"><span>Red LSB</span></div>
+            <span>Kanal Merah (R)</span>
+          </div>
+          <div class="lsb-card">
+            <div class="lsb-img" id="lsbGreen"><span>Green LSB</span></div>
+            <span>Kanal Hijau (G)</span>
+          </div>
+          <div class="lsb-card">
+            <div class="lsb-img" id="lsbBlue"><span>Blue LSB</span></div>
+            <span>Kanal Biru (B)</span>
+          </div>
+        </div>
+      </article>
+    </section>
   </main>
   <footer><span>HideBit <b>·</b> Information Security Lab</span><span>Processing stays in your browser</span></footer>
   <script src="app.js"></script>

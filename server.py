@@ -186,6 +186,7 @@ def extract():
 def analyze():
     """
     Melakukan steganalisis Chi-Square (Pairs of Values) dan ekstraksi visual LSB Plane.
+    Mendukung mode Blind Analysis (1 citra) maupun Dual Comparative Analysis (Cover vs Stego).
     """
     if "image" not in request.files:
         return jsonify({"success": False, "error": "Berkas citra wajib diunggah untuk analisis."}), 400
@@ -194,7 +195,7 @@ def analyze():
         img_file = request.files["image"]
         img = Image.open(img_file.stream).convert("RGB")
 
-        # 1. Analisis statistik Chi-Square PoV
+        # 1. Analisis statistik Chi-Square PoV + Vonis Forensik
         analysis_result = analyze_image(img)
 
         # 2. Ekstrak LSB Plane per kanal (0=Red, 1=Green, 2=Blue)
@@ -202,12 +203,37 @@ def analyze():
         green_lsb = lsb_plane(img, channel=1)
         blue_lsb = lsb_plane(img, channel=2)
 
-        # 3. Data Histogram untuk perbandingan/inspeksi
+        # 3. Data Histogram untuk inspeksi
         hist_data = get_histogram_data(img)
+
+        # 4. Mode Komparasi jika Citra Referensi Asli (Cover) disertakan
+        comparison = None
+        if "reference" in request.files and request.files["reference"].filename:
+            ref_file = request.files["reference"]
+            ref_img = Image.open(ref_file.stream).convert("RGB")
+            if ref_img.size != img.size:
+                return jsonify({
+                    "success": False,
+                    "error": f"Dimensi citra referensi ({ref_img.size[0]}x{ref_img.size[1]}) tidak sama dengan citra analisis ({img.size[0]}x{img.size[1]})."
+                }), 400
+
+            comp_metrics = get_image_metrics(ref_img, img)
+            diff_img = generate_difference_heatmap(ref_img, img)
+            ref_analysis = analyze_image(ref_img)
+
+            comparison = {
+                "has_reference": True,
+                "metrics": comp_metrics,
+                "difference_map": image_to_base64(diff_img, "PNG"),
+                "reference_score": ref_analysis["score"],
+                "reference_channels": ref_analysis["channels"],
+                "reference_verdict": ref_analysis["verdict"],
+            }
 
         return jsonify({
             "success": True,
             "score": analysis_result["score"],
+            "verdict": analysis_result["verdict"],
             "interpretation": analysis_result["interpretation"],
             "channels": analysis_result["channels"],
             "lsb_planes": {
@@ -215,7 +241,9 @@ def analyze():
                 "green": image_to_base64(green_lsb, "PNG"),
                 "blue": image_to_base64(blue_lsb, "PNG")
             },
-            "histogram": hist_data
+            "histogram": hist_data,
+            "comparison": comparison,
+            "image_size": f"{img.width} x {img.height} px"
         })
 
     except Exception as e:

@@ -116,9 +116,58 @@ def analyze_image(image: Image.Image) -> Dict[str, Any]:
         }
         p_values.append(p_value)
     score = round(100.0 * float(np.mean(p_values)), 2)
+    verdict = generate_forensic_verdict(score, channels)
     return {
         "score": score,
         "interpretation": "heuristic suspicion score; not a calibrated probability",
         "channels": channels,
+        "verdict": verdict,
+    }
+
+
+def generate_forensic_verdict(score: float, channels: Dict[str, Dict[str, float | int]]) -> Dict[str, Any]:
+    """Generate human-readable forensic conclusion and narrative from Chi-Square PoV metrics."""
+    high_p_channels = [name for name, data in channels.items() if float(data.get("p_value", 0.0)) >= 0.80]
+    
+    if score >= 65.0 or len(high_p_channels) >= 2:
+        level = "ANOMALY_DETECTED"
+        badge_label = "ANOMALI LSB TERDETEKSI"
+        status_color = "danger"
+        title = "Indikasi Kuat Citra Steganografi LSB"
+        narrative = (
+            f"Analisis statistik Pasangan Nilai (Pairs of Values) menunjukkan anomali kesetimbangan frekuensi yang signifikan "
+            f"pada kanal: {', '.join([c.capitalize() for c in high_p_channels]) if high_p_channels else 'seluruh kanal'}. "
+            f"Pola kesetimbangan ini mencerminkan karakteristik khas dari substitusi bit terenkripsi acak ke dalam bidang LSB (Bit-0)."
+        )
+        recommendation = "Citra dicurigai kuat membawa payload tersembunyi. Disarankan melakukan uji ekstraksi pada tab Reveal Message menggunakan stego-key yang sesuai."
+    elif score >= 35.0 or len(high_p_channels) == 1:
+        level = "SUSPICIOUS"
+        badge_label = "INDIKASI MODERAT"
+        status_color = "warning"
+        title = "Pola Statistik Ambigu / Perlu Investigasi"
+        narrative = (
+            f"Ditemukan fluktuasi distribusi pasangan nilai pada satu kanal warna, namun belum cukup kuat untuk memvonis keberadaan payload penuh. "
+            f"Hal ini dapat terjadi akibat tekstur citra bergradien halus, kompresi sekunder, atau kapasitas muatan yang sangat kecil."
+        )
+        recommendation = "Lakukan inspeksi visual pada bidang LSB (Bit-0) di bawah untuk memeriksa ada/tidaknya pola noise teracak pada area citra."
+    else:
+        level = "CLEAN"
+        badge_label = "CITRA BERSIH / ALAMI"
+        status_color = "safe"
+        title = "Tidak Terdeteksi Anomali LSB"
+        narrative = (
+            f"Frekuensi pasangan nilai piksel (PoV) terdistribusi secara heterogen dan wajar sebagaimana karakteristik citra alami. "
+            f"Nilai Chi-Square kanal menghasilkan p-value rendah yang menandakan tidak adanya manipulasi bit LSB terorganisir."
+        )
+        recommendation = "Citra berada dalam parameter normal dan bersih dari indikasi penyisipan data terenkripsi LSB."
+
+    return {
+        "level": level,
+        "badge_label": badge_label,
+        "status_color": status_color,
+        "title": title,
+        "narrative": narrative,
+        "recommendation": recommendation,
+        "high_anomaly_channels": high_p_channels,
     }
 
