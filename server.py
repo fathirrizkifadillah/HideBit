@@ -11,10 +11,10 @@ import traceback
 from flask import Flask, request, jsonify, send_from_directory
 from PIL import Image
 
-from src.crypto import encrypt_message, decrypt_message
+from src.crypto import encrypt_message, decrypt_message, get_compression_info
 from src.stego import embed_payload, extract_payload, get_image_capacity
 from src.steganalysis import analyze_image, lsb_plane, extract_message
-from src.metrics import get_image_metrics, get_histogram_data, image_to_base64
+from src.metrics import get_image_metrics, get_histogram_data, image_to_base64, generate_difference_heatmap
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR)
@@ -75,7 +75,8 @@ def embed():
         cover_img = Image.open(cover_file.stream).convert("RGB")
         capacity = get_image_capacity(cover_img)
 
-        # 1. Enkripsi pesan dengan AES-256-GCM + PBKDF2
+        # 1. Enkripsi pesan dengan AES-256-GCM + PBKDF2 (adaptif zlib)
+        comp_info = get_compression_info(message)
         encrypted_payload = encrypt_message(message, key)
         payload_len = len(encrypted_payload)
 
@@ -88,13 +89,17 @@ def embed():
         # 4. Hitung persentase kapasitas yang digunakan
         used_percent = round((payload_len / max(1, capacity["max_payload_bytes"])) * 100, 2)
 
-        # 5. Konversi stego image ke Base64 PNG data URL
+        # 5. Konversi stego image & difference heatmap ke Base64 PNG data URL
         stego_b64 = image_to_base64(stego_img, "PNG")
+        diff_img = generate_difference_heatmap(cover_img, stego_img)
+        diff_b64 = image_to_base64(diff_img, "PNG")
 
         return jsonify({
             "success": True,
             "stego_image": stego_b64,
+            "difference_map": diff_b64,
             "metrics": metrics,
+            "compression": comp_info,
             "payload_bytes": payload_len,
             "message_chars": len(message),
             "capacity_bytes": capacity["max_payload_bytes"],

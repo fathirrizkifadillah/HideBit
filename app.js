@@ -3,6 +3,7 @@
  * ======
  * Client-side script untuk HideBit Web Interface
  * Menghubungkan UI ke backend Flask API (/api/capacity, /api/embed, /api/extract, /api/analyze)
+ * Dilengkapi pratinjau thumbnail instan, tombol ganti/batal gambar, dan statistik komparasi mendalam.
  */
 
 const views = [...document.querySelectorAll(".view")];
@@ -45,9 +46,47 @@ function imageMeta(file, image, capacityBytes = 0) {
   return `<strong>${file.name}</strong><span>${image.width} x ${image.height}px · ${formatBytes(file.size)}${capStr}</span>`;
 }
 
-function bindImageInput(inputId, metaId, kind) {
+function setupImagePicker({
+  inputId,
+  dropId,
+  cardId,
+  thumbId,
+  metaId,
+  cancelBtnId,
+  kind,
+}) {
   const input = document.getElementById(inputId);
+  const drop = document.getElementById(dropId);
+  const card = document.getElementById(cardId);
+  const thumb = document.getElementById(thumbId);
   const meta = document.getElementById(metaId);
+  const cancelBtn = document.getElementById(cancelBtnId);
+
+  const clearSelection = () => {
+    input.value = "";
+    state[`${kind}File`] = null;
+    state[`${kind}Url`] = null;
+    if (thumb) thumb.src = "";
+    if (meta) meta.innerHTML = "";
+    if (card) card.classList.add("hidden");
+    if (drop) drop.classList.remove("hidden");
+
+    if (kind === "cover") {
+      state.capacityBytes = 0;
+      updateCapacity();
+      const cp = document.getElementById("coverPreview");
+      if (cp) cp.innerHTML = "Cover Image";
+      const sz = document.getElementById("resultImageSize");
+      if (sz) sz.textContent = "--";
+    }
+  };
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      clearSelection();
+    });
+  }
 
   input.addEventListener("change", async () => {
     const file = input.files[0];
@@ -55,13 +94,19 @@ function bindImageInput(inputId, metaId, kind) {
 
     readImage(file, async (image, url) => {
       state[`${kind}File`] = file;
-      meta.innerHTML = imageMeta(file, image);
-      meta.classList.remove("hidden");
+      state[`${kind}Url`] = url;
+
+      // 1. Tampilkan thumbnail gambar seketika
+      if (thumb) thumb.src = url;
+      if (meta) meta.innerHTML = imageMeta(file, image);
+      if (drop) drop.classList.add("hidden");
+      if (card) card.classList.remove("hidden");
 
       if (kind === "cover") {
-        state.coverUrl = url;
-        document.getElementById("coverPreview").innerHTML = `<img src="${url}" alt="Cover image preview">`;
-        document.getElementById("resultImageSize").textContent = `${image.width} x ${image.height}px`;
+        const cp = document.getElementById("coverPreview");
+        if (cp) cp.innerHTML = `<img src="${url}" alt="Cover image preview">`;
+        const sz = document.getElementById("resultImageSize");
+        if (sz) sz.textContent = `${image.width} x ${image.height}px`;
 
         // Request kapasitas riil ke backend
         try {
@@ -71,18 +116,19 @@ function bindImageInput(inputId, metaId, kind) {
           const json = await res.json();
           if (json.success) {
             state.capacityBytes = json.capacity.max_payload_bytes;
-            meta.innerHTML = imageMeta(file, image, state.capacityBytes);
+            if (meta) meta.innerHTML = imageMeta(file, image, state.capacityBytes);
             updateCapacity();
           }
         } catch (err) {
           console.warn("Gagal mengecek kapasitas backend:", err);
-          // Fallback lokal
           state.capacityBytes = Math.max(0, Math.floor((image.width * image.height * 3 - 64) / 8));
           updateCapacity();
         }
       }
     });
   });
+
+  return { clearSelection };
 }
 
 function updateCapacity() {
@@ -98,17 +144,45 @@ function updateCapacity() {
   document.getElementById("charCount").textContent = `${message.length} / 1000`;
 }
 
+// Inisialisasi Image Pickers dengan Thumbnail & Tombol Batal/Ganti
+const coverPicker = setupImagePicker({
+  inputId: "coverInput",
+  dropId: "coverDrop",
+  cardId: "coverCard",
+  thumbId: "coverThumbImg",
+  metaId: "coverMeta",
+  cancelBtnId: "coverCancelBtn",
+  kind: "cover",
+});
+
+const stegoPicker = setupImagePicker({
+  inputId: "stegoInput",
+  dropId: "stegoDrop",
+  cardId: "stegoCard",
+  thumbId: "stegoThumbImg",
+  metaId: "stegoMeta",
+  cancelBtnId: "stegoCancelBtn",
+  kind: "stego",
+});
+
+const analysisPicker = setupImagePicker({
+  inputId: "analysisInput",
+  dropId: "analysisDrop",
+  cardId: "analysisCard",
+  thumbId: "analysisThumbImg",
+  metaId: "analysisMeta",
+  cancelBtnId: "analysisCancelBtn",
+  kind: "analysis",
+});
+
 function resetHide() {
   document.getElementById("hideResult").classList.add("hidden");
   document.getElementById("messageInput").value = "";
   document.getElementById("hideKey").value = "";
-  document.getElementById("coverMeta").classList.add("hidden");
-  document.getElementById("coverInput").value = "";
   document.getElementById("charCount").textContent = "0 / 1000";
   document.getElementById("capacityText").textContent = "0%";
   document.getElementById("capacityBar").style.width = "0%";
-  state.coverFile = null;
-  state.coverUrl = null;
+  coverPicker.clearSelection();
   state.stegoDataUrl = null;
 }
 
@@ -158,8 +232,24 @@ async function handleHideMessage() {
     const preview = document.getElementById("stegoPreview");
     preview.innerHTML = `<img src="${state.stegoDataUrl}" alt="Stego image preview"><small>Protected</small>`;
 
+    // Tampilkan pratinjau Difference Heatmap (Peta Sebaran PRNG)
+    const diffPreview = document.getElementById("diffPreview");
+    if (diffPreview && data.difference_map) {
+      diffPreview.innerHTML = `<img src="${data.difference_map}" alt="Difference Map"><small>PRNG Spread (×255)</small>`;
+    }
+
     // Update spesifikasi metrik
     document.getElementById("resultMessageSize").textContent = `${data.payload_bytes} B (${data.message_chars} chars)`;
+    const compEl = document.getElementById("resultCompression");
+    if (compEl) {
+      if (data.compression && data.compression.is_compressed) {
+        compEl.textContent = `zlib -${data.compression.ratio_percent}% (${data.compression.saved_bytes}B saved)`;
+        compEl.style.color = "var(--teal)";
+      } else {
+        compEl.textContent = "Raw (no gain)";
+        compEl.style.color = "inherit";
+      }
+    }
     document.getElementById("resultImageSize").textContent = data.image_size;
     if (document.getElementById("resultPSNR")) {
       document.getElementById("resultPSNR").textContent = `${data.metrics.psnr_db} dB`;
@@ -172,6 +262,29 @@ async function handleHideMessage() {
     }
     if (document.getElementById("resultChangedPixels")) {
       document.getElementById("resultChangedPixels").textContent = `${data.metrics.changed_pixels} px (${data.metrics.pixel_change_percent}%)`;
+    }
+
+    // Update Kotak Statistik Komparasi Piksel Mendalam
+    if (data.metrics) {
+      const m = data.metrics;
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+
+      setVal("statUnchangedPx", `${m.unchanged_pixels.toLocaleString()} px`);
+      setVal("statUnchangedPct", `${m.unchanged_percent}% identik sempurna`);
+      setVal("statChangedPx", `${m.changed_pixels.toLocaleString()} px`);
+      setVal("statChangedPct", `${m.pixel_change_percent}% sebaran PRNG`);
+      setVal("fidelityTag", `${m.unchanged_percent}% Identik`);
+      setVal("statPsnrBadge", `${m.psnr_db}`);
+      setVal("statMaxDelta", `±${m.max_delta || 1} / 255 (0.39%)`);
+
+      if (m.channel_changes) {
+        setVal("statChangedR", `${m.channel_changes.r.toLocaleString()} px`);
+        setVal("statChangedG", `${m.channel_changes.g.toLocaleString()} px`);
+        setVal("statChangedB", `${m.channel_changes.b.toLocaleString()} px`);
+      }
     }
 
     document.getElementById("hideResult").classList.remove("hidden");
@@ -336,9 +449,7 @@ document.getElementById("revealAnother").addEventListener("click", () => {
   document.getElementById("revealResult").classList.add("hidden");
   document.getElementById("revealError").classList.add("hidden");
   document.getElementById("revealKey").value = "";
-  document.getElementById("stegoInput").value = "";
-  document.getElementById("stegoMeta").classList.add("hidden");
-  state.stegoFile = null;
+  stegoPicker.clearSelection();
 });
 document.getElementById("analyzeButton").addEventListener("click", handleSteganalysis);
 
@@ -359,9 +470,5 @@ document.querySelectorAll("[data-toggle-password]").forEach((button) => {
     button.textContent = input.type === "password" ? "Show" : "Hide";
   });
 });
-
-bindImageInput("coverInput", "coverMeta", "cover");
-bindImageInput("stegoInput", "stegoMeta", "stego");
-bindImageInput("analysisInput", "analysisMeta", "analysis");
 
 setRoute(location.hash.slice(1) || "home");
