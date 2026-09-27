@@ -129,4 +129,19 @@
 .compare-heatmap-card .label{font-size:11px;color:var(--muted);font-weight:600}
 .heatmap-img-wrap{height:120px;background:#0e1315;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:4px}
 .heatmap-img-wrap img{max-width:100%;max-height:100%;object-fit:contain}
+
+/* Key Toolbar & Strength Meter */
+.key-toolbar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.key-strength-container{margin-top:14px;padding:12px 14px;background:var(--soft);border:1px solid var(--line);border-radius:9px}
+.key-strength-header{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:6px}
+.key-strength-title{color:var(--muted)}
+.key-strength-title strong{color:var(--ink);font-weight:700}
+.key-entropy{font-size:11px;font-weight:700;color:var(--muted);font-family:"Space Grotesk",sans-serif}
+.key-strength-bar-bg{height:6px;background:#e1e7e5;border-radius:6px;overflow:hidden}
+.key-strength-bar{height:100%;width:0;border-radius:6px;transition:width .3s ease,background .3s ease}
+.key-strength-bar.weak{width:25%;background:var(--red)}
+.key-strength-bar.medium{width:55%;background:var(--yellow)}
+.key-strength-bar.strong{width:80%;background:var(--teal)}
+.key-strength-bar.very-strong{width:100%;background:#10b981}
+.key-strength-hint{margin:6px 0 0 0;font-size:11px;color:var(--muted);line-height:1.4}
 

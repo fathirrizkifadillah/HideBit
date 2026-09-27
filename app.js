@@ -862,6 +862,145 @@ document.getElementById("analyzeButton").addEventListener("click", handleStegana
 const exportBtn = document.getElementById("exportReportBtn");
 if (exportBtn) exportBtn.addEventListener("click", downloadForensicReport);
 
+// CSPRNG Random Key Generator (Cryptographically Secure)
+function generateSecureKey(length = 20) {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "!@#$%^&*-_+=?";
+  const allChars = upper + lower + digits + symbols;
+
+  const array = new Uint32Array(length);
+  window.crypto.getRandomValues(array);
+
+  let keyChars = [
+    upper[array[0] % upper.length],
+    lower[array[1] % lower.length],
+    digits[array[2] % digits.length],
+    symbols[array[3] % symbols.length],
+  ];
+
+  for (let i = 4; i < length; i++) {
+    keyChars.push(allChars[array[i] % allChars.length]);
+  }
+
+  // Fisher-Yates shuffle
+  const shuffleArray = new Uint32Array(length);
+  window.crypto.getRandomValues(shuffleArray);
+  for (let i = keyChars.length - 1; i > 0; i--) {
+    const j = shuffleArray[i] % (i + 1);
+    [keyChars[i], keyChars[j]] = [keyChars[j], keyChars[i]];
+  }
+
+  return keyChars.join("");
+}
+
+// Evaluate Key Strength & Shannon Entropy
+function evaluateKeyStrength(key) {
+  if (!key || key.length === 0) {
+    return { score: 0, label: "Belum Ada Kunci", entropy: 0, cssClass: "", hint: "Masukkan kata sandi atau klik tombol Generate Strong Key di atas." };
+  }
+
+  let poolSize = 0;
+  if (/[a-z]/.test(key)) poolSize += 26;
+  if (/[A-Z]/.test(key)) poolSize += 26;
+  if (/[0-9]/.test(key)) poolSize += 10;
+  if (/[^a-zA-Z0-9]/.test(key)) poolSize += 32;
+
+  const entropy = Math.round(key.length * Math.log2(Math.max(2, poolSize)));
+
+  if (key.length < 8 || entropy < 35) {
+    return {
+      score: 1,
+      label: "Lemah",
+      entropy,
+      cssClass: "weak",
+      hint: "Kunci terlalu pendek atau sederhana; sangat rentan terhadap dictionary attack.",
+    };
+  } else if (key.length < 12 || entropy < 60) {
+    return {
+      score: 2,
+      label: "Sedang",
+      entropy,
+      cssClass: "medium",
+      hint: "Cukup baik, tetapi disarankan menambahkan variasi simbol dan panjang minimal 16 karakter.",
+    };
+  } else if (key.length < 16 || entropy < 85) {
+    return {
+      score: 3,
+      label: "Kuat",
+      entropy,
+      cssClass: "strong",
+      hint: "Entropi tinggi; memberikan pertahanan solid terhadap serangan brute-force.",
+    };
+  } else {
+    return {
+      score: 4,
+      label: "Sangat Kuat (Kriptografis)",
+      entropy,
+      cssClass: "very-strong",
+      hint: "Tingkat keamanan maksimal berstandar kriptografi; mustahil ditembus secara komputasi praktis.",
+    };
+  }
+}
+
+function updateKeyStrengthUI() {
+  const input = document.getElementById("hideKey");
+  if (!input) return;
+
+  const res = evaluateKeyStrength(input.value);
+  const labelEl = document.getElementById("keyStrengthLabel");
+  const entropyEl = document.getElementById("keyEntropyText");
+  const barEl = document.getElementById("keyStrengthBar");
+  const hintEl = document.getElementById("keyStrengthHint");
+
+  if (labelEl) labelEl.textContent = res.label;
+  if (entropyEl) entropyEl.textContent = `~${res.entropy} bits`;
+  if (hintEl) hintEl.textContent = res.hint;
+
+  if (barEl) {
+    barEl.className = "key-strength-bar " + res.cssClass;
+  }
+}
+
+const hideKeyInput = document.getElementById("hideKey");
+if (hideKeyInput) {
+  hideKeyInput.addEventListener("input", updateKeyStrengthUI);
+}
+
+const genKeyBtn = document.getElementById("generateKeyBtn");
+if (genKeyBtn) {
+  genKeyBtn.addEventListener("click", () => {
+    const newKey = generateSecureKey(20);
+    const input = document.getElementById("hideKey");
+    if (input) {
+      input.value = newKey;
+      input.type = "text";
+      const toggleBtn = document.querySelector('[data-toggle-password="hideKey"]');
+      if (toggleBtn) toggleBtn.textContent = "Hide";
+      updateKeyStrengthUI();
+    }
+  });
+}
+
+const copyKeyBtn = document.getElementById("copyKeyBtn");
+if (copyKeyBtn) {
+  copyKeyBtn.addEventListener("click", async () => {
+    const input = document.getElementById("hideKey");
+    if (!input || !input.value) {
+      alert("Belum ada kunci untuk disalin. Masukkan kunci atau klik Generate Strong Key.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(input.value);
+      copyKeyBtn.textContent = "Tersalin!";
+      setTimeout(() => { copyKeyBtn.textContent = "Salin Kunci"; }, 2000);
+    } catch {
+      alert("Kunci Anda: " + input.value);
+    }
+  });
+}
+
 document.getElementById("copyButton").addEventListener("click", async (event) => {
   try {
     await navigator.clipboard.writeText(document.getElementById("revealedText").textContent);
