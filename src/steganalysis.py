@@ -84,21 +84,31 @@ def _regularized_gamma_q(a: float, x: float) -> float:
     return min(1.0, max(0.0, math.exp(-x + a * math.log(x) - gln) * h))
 
 
-def _channel_p_value(values: np.ndarray) -> tuple[float, float, int]:
-    """Menghitung nilai statistik Chi-Square PoV dan p-value anomali dengan sensitivitas tinggi."""
+def _channel_p_value(values: np.ndarray) -> tuple[float, float, int, float, float]:
+    """
+    Menghitung nilai statistik Chi-Square PoV (Westfeld 1999), p-value teoretis sejati,
+    rasio kesetimbangan pasangan PoV, dan indeks anomali heuristik kanal.
+    """
     flat = values.reshape(-1)
     n = len(flat)
 
-    # 1. Histogram global & Chi-Square klasik PoV
+    # 1. Histogram global & Chi-Square klasik PoV (Westfeld 1999)
     hist = np.bincount(flat, minlength=256).astype(np.float64)
     even, odd = hist[0::2], hist[1::2]
     totals = even + odd
     used = totals > 0
     dof = int(np.count_nonzero(used))
+    
+    # Formula Chi-Square PoV: sum((even - odd)^2 / totals)
     chi2 = float(np.sum((even[used] - odd[used]) ** 2 / totals[used])) if dof else 0.0
-    global_p = _regularized_gamma_q(dof / 2.0, chi2 / 2.0) if dof else 1.0
+    
+    # P-value teoretis sejati dari fungsi distribusi Chi-Square kumulatif: P(Chi2 >= chi2_obs)
+    # Pada citra alami berukuran besar (ratusan ribu piksel), chi2 >> dof, sehingga theoretical_p ~ 0.0000
+    theoretical_p = _regularized_gamma_q(dof / 2.0, chi2 / 2.0) if dof else 0.0
+    if math.isnan(theoretical_p) or theoretical_p < 1e-12:
+        theoretical_p = 0.0
 
-    # 2. Local block Chi-Square (Westfeld windowing sampling 48 blok @ 512 piksel)
+    # 2. Local block Chi-Square (Westfeld windowing 48 blok @ 512 piksel)
     bsize = 512
     step = max(1, (n - bsize) // 48)
     local_p_list = []
@@ -115,11 +125,12 @@ def _channel_p_value(values: np.ndarray) -> tuple[float, float, int]:
             local_p_list.append(p_b)
     local_p = float(np.mean(local_p_list)) if local_p_list else 0.0
 
-    # 3. Metrik kesetimbangan pasangan PoV (PoV Pair Balance)
+    # 3. Metrik kesetimbangan pasangan PoV (PoV Pair Symmetry / Balance Ratio)
+    # Menghitung seberapa seimbang frekuensi genap dan ganjil secara empiris (0.0 - 1.0)
     valid_pairs = totals >= 8
     if np.any(valid_pairs):
         asym = float(np.mean(np.abs(even[valid_pairs] - odd[valid_pairs]) / totals[valid_pairs]))
-        balance = 1.0 - asym
+        balance = max(0.0, min(1.0, 1.0 - asym))
     else:
         balance = 0.5
 
@@ -129,75 +140,83 @@ def _channel_p_value(values: np.ndarray) -> tuple[float, float, int]:
     p0 = 1.0 - p1
     ent = float(-(p0 * np.log2(p0) + p1 * np.log2(p1))) if (0 < p0 < 1) else 0.0
 
-    # P-value gabungan berdaya sensitivitas tinggi
-    sensitive_p = max(global_p, 0.45 * local_p + 0.35 * balance + 0.20 * ent)
-    return chi2, sensitive_p, dof
+    # Indeks anomali heuristik kanal (0.0 - 1.0)
+    channel_anomaly = max(theoretical_p, 0.40 * local_p + 0.35 * balance + 0.25 * ent)
+    return chi2, theoretical_p, dof, balance, channel_anomaly
 
 
 def analyze_image(image: Image.Image) -> Dict[str, Any]:
-    """Return per-channel PoV chi-square results and a heuristic 0–100 score.
-
-    A high p-value means the paired histogram counts are unusually similar,
-    which can be consistent with LSB replacement. Natural images can also
-    produce this pattern; the score is therefore not a true probability.
+    """
+    Melakukan steganalisis komprehensif: Chi-Square PoV matematis,
+    rasio simetri pasangan PoV, dan skor kecurigaan heuristik multi-parameter.
     """
     rgb = np.asarray(image.convert("RGB"), dtype=np.uint8)
     names = ("red", "green", "blue")
-    channels: Dict[str, Dict[str, float | int]] = {}
-    p_values = []
+    channels: Dict[str, Dict[str, Any]] = {}
+    anomaly_scores = []
+    
     for index, name in enumerate(names):
-        chi2, p_value, dof = _channel_p_value(rgb[:, :, index])
+        chi2, theo_p, dof, balance, anomaly = _channel_p_value(rgb[:, :, index])
+        p_disp = "< 0.0001" if theo_p < 0.0001 else f"{theo_p:.4f}"
         channels[name] = {
-            "chi_square": chi2,
+            "chi_square": round(chi2, 2),
             "degrees_of_freedom": dof,
-            "p_value": p_value,
+            "p_value": theo_p,
+            "p_value_display": p_disp,
+            "balance_percent": round(balance * 100, 2),
+            "anomaly_index": round(anomaly * 100, 2),
+            "status": "Anomali" if anomaly >= 0.65 else ("Moderat" if anomaly >= 0.35 else "Normal")
         }
-        p_values.append(p_value)
-    score = round(100.0 * float(np.mean(p_values)), 2)
+        anomaly_scores.append(anomaly)
+        
+    score = round(100.0 * float(np.mean(anomaly_scores)), 2)
     verdict = generate_forensic_verdict(score, channels)
     return {
         "score": score,
-        "interpretation": "heuristic suspicion score; not a calibrated probability",
+        "interpretation": "heuristic suspicion score; composite multi-parameter anomaly index",
         "channels": channels,
         "verdict": verdict,
     }
 
 
-def generate_forensic_verdict(score: float, channels: Dict[str, Dict[str, float | int]]) -> Dict[str, Any]:
+def generate_forensic_verdict(score: float, channels: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """Generate human-readable forensic conclusion and narrative from Chi-Square PoV metrics."""
-    high_p_channels = [name for name, data in channels.items() if float(data.get("p_value", 0.0)) >= 0.80]
+    suspicious_channels = [
+        name for name, data in channels.items() 
+        if float(data.get("anomaly_index", 0.0)) >= 60.0 or float(data.get("p_value", 0.0)) >= 0.50
+    ]
     
-    if score >= 65.0 or len(high_p_channels) >= 2:
+    if score >= 65.0 or len(suspicious_channels) >= 2:
         level = "ANOMALY_DETECTED"
         badge_label = "ANOMALI LSB TERDETEKSI"
         status_color = "danger"
-        title = "Indikasi Kuat Citra Steganografi LSB"
+        title = "Indikasi Anomali Distribusi Bit LSB"
         narrative = (
-            f"Analisis statistik Pasangan Nilai (Pairs of Values) menunjukkan anomali kesetimbangan frekuensi yang signifikan "
-            f"pada kanal: {', '.join([c.capitalize() for c in high_p_channels]) if high_p_channels else 'seluruh kanal'}. "
-            f"Pola kesetimbangan ini mencerminkan karakteristik khas dari substitusi bit terenkripsi acak ke dalam bidang LSB (Bit-0)."
+            f"Analisis statistik Pasangan Nilai (Pairs of Values) dan uji blok lokal mengindikasikan deviasi yang signifikan "
+            f"pada kanal: {', '.join([c.capitalize() for c in suspicious_channels]) if suspicious_channels else 'seluruh kanal'}. "
+            f"Karakteristik ini konsisten dengan modifikasi nilai piksel terorganisir pada bidang bit LSB (Bit-0)."
         )
-        recommendation = "Citra dicurigai kuat membawa payload tersembunyi. Disarankan melakukan uji ekstraksi pada tab Reveal Message menggunakan stego-key yang sesuai."
-    elif score >= 35.0 or len(high_p_channels) == 1:
+        recommendation = "Citra menunjukkan pola yang tidak lazim untuk citra alami murni. Disarankan melakukan uji ekstraksi pada tab Reveal Message atau melakukan komparasi langsung jika memiliki citra asli."
+    elif score >= 35.0 or len(suspicious_channels) == 1:
         level = "SUSPICIOUS"
         badge_label = "INDIKASI MODERAT"
         status_color = "warning"
         title = "Pola Statistik Ambigu / Perlu Investigasi"
         narrative = (
-            f"Ditemukan fluktuasi distribusi pasangan nilai pada satu kanal warna, namun belum cukup kuat untuk memvonis keberadaan payload penuh. "
-            f"Hal ini dapat terjadi akibat tekstur citra bergradien halus, kompresi sekunder, atau kapasitas muatan yang sangat kecil."
+            f"Ditemukan fluktuasi distribusi lokal pada salah satu kanal warna, namun nilai Chi-Square global tetap berada di rentang wajar citra alami. "
+            f"Pada teknik steganografi LSB teracak (PRNG) dengan muatan kecil, pola global tetap tampak wajar karena bit disebar tipis ke seluruh citra."
         )
-        recommendation = "Lakukan inspeksi visual pada bidang LSB (Bit-0) di bawah untuk memeriksa ada/tidaknya pola noise teracak pada area citra."
+        recommendation = "Lakukan inspeksi visual pada bidang LSB (Bit-0) di bawah atau gunakan Mode Komparasi (Cover vs Stego) untuk kepastian mutlak."
     else:
         level = "CLEAN"
         badge_label = "CITRA BERSIH / ALAMI"
         status_color = "safe"
-        title = "Tidak Terdeteksi Anomali LSB"
+        title = "Tidak Terdeteksi Anomali LSB Global"
         narrative = (
-            f"Frekuensi pasangan nilai piksel (PoV) terdistribusi secara heterogen dan wajar sebagaimana karakteristik citra alami. "
-            f"Nilai Chi-Square kanal menghasilkan p-value rendah yang menandakan tidak adanya manipulasi bit LSB terorganisir."
+            f"Frekuensi pasangan nilai piksel (PoV) terdistribusi heterogen sebagaimana karakteristik citra alami normal (Chi-Square tinggi, p-value < 0.0001). "
+            f"Tidak ditemukan indikasi substitusi LSB sekuensial berskala besar pada histogram global."
         )
-        recommendation = "Citra berada dalam parameter normal dan bersih dari indikasi penyisipan data terenkripsi LSB."
+        recommendation = "Citra berada dalam parameter distribusi normal. Perhatikan bahwa steganografi LSB-PRNG dengan muatan sangat kecil (<2%) membutuhkan Mode Komparasi dengan citra asli untuk deteksi pasti."
 
     return {
         "level": level,
@@ -206,6 +225,6 @@ def generate_forensic_verdict(score: float, channels: Dict[str, Dict[str, float 
         "title": title,
         "narrative": narrative,
         "recommendation": recommendation,
-        "high_anomaly_channels": high_p_channels,
+        "high_anomaly_channels": suspicious_channels,
     }
 

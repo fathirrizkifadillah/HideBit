@@ -40,6 +40,35 @@
         <button class="analysis-mode-tab" id="tabModeCompare" type="button">Mode Komparasi (Cover vs Stego)</button>
       </div>
 
+      <article class="method-guide-card">
+        <div class="guide-header" id="guideToggleBtn">
+          <div class="guide-title-wrap">
+            <span class="guide-badge">PANDUAN FORENSIK</span>
+            <h4>Apa yang Dianalisis &amp; Apa Bedanya?</h4>
+          </div>
+          <span class="guide-toggle-icon" id="guideToggleIcon">▼</span>
+        </div>
+        <div class="guide-content" id="guideContent">
+          <div class="guide-grid">
+            <div class="guide-col">
+              <h5>1. Uji Statistik Chi-Square PoV (Westfeld)</h5>
+              <p><b>Yang dianalisis:</b> Frekuensi pasangan nilai piksel bersebelahan $(2k, 2k+1)$ pada histogram 8-bit (misal 0-1, 2-3, 254-255).</p>
+              <p><b>Karakteristik:</b> Citra alami bervariasi heterogen ($\chi^2$ tinggi, $p &lt; 0.0001$). Substitusi LSB masif menyamakan pasangan nilai. Pada LSB teracak (PRNG) muatan kecil, uji global tetap tampak normal karena bit disebar tipis.</p>
+            </div>
+            <div class="guide-col">
+              <h5>2. Inspeksi Visual Bitplane LSB (Bit-0)</h5>
+              <p><b>Yang dianalisis:</b> Lapisan bit ke-0 (Least Significant Bit) pada kanal Red, Green, dan Blue.</p>
+              <p><b>Bedanya:</b> Citra alami mempertahankan siluet kontur objek asli. Area yang disisipi ciphertext AES-256 memperlihatkan <i>high-entropy noise</i> (derau bintik semut acak).</p>
+            </div>
+            <div class="guide-col">
+              <h5>3. Komparasi Diferensial (Cover vs Stego)</h5>
+              <p><b>Yang dianalisis:</b> Selisih piksel-demi-piksel antara citra asli (cover) dan citra uji (stego).</p>
+              <p><b>Bedanya:</b> Memberikan bukti mutlak (ground truth) berupa nilai PSNR, MSE, persis berapa piksel yang diinjeksi oleh ChaCha20 PRNG, dan peta koordinat penyisipan (Difference Heatmap x255).</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
       <div class="analysis-layout">
         <article class="panel analysis-upload">
           <div class="section-title">
@@ -191,22 +220,23 @@
             <thead>
               <tr id="tableHeaderRow">
                 <th>Kanal Warna</th>
-                <th>Chi-Square</th>
+                <th>Chi-Square (χ²)</th>
                 <th>Degrees of Freedom</th>
-                <th>P-Value</th>
-                <th>Status Anomali</th>
+                <th>p-value Teoretis</th>
+                <th>Kesetimbangan PoV</th>
+                <th>Status Kanal</th>
               </tr>
             </thead>
             <tbody id="channelRows">
-              <tr><td><i class="channel-dot red"></i> Red</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
-              <tr><td><i class="channel-dot green"></i> Green</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
-              <tr><td><i class="channel-dot blue"></i> Blue</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+              <tr><td><i class="channel-dot red"></i> Red</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+              <tr><td><i class="channel-dot green"></i> Green</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
+              <tr><td><i class="channel-dot blue"></i> Blue</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>
             </tbody>
           </table>
         </div>
         <div class="interpretation">
           <span>i</span>
-          <p><b>Interpretasi Statistik:</b> Nilai p-value mendekati 1.00 menandakan frekuensi pasangan nilai piksel (Pairs of Values) sangat seimbang akibat substitusi bit ciphertext secara acak, yang merupakan ciri khas manipulasi LSB.</p>
+          <p><b>Interpretasi Statistik PoV (Westfeld 1999):</b> Nilai Chi-Square ($\chi^2$) yang besar dengan p-value teoretis &lt; 0.0001 menunjukkan frekuensi pasangan nilai piksel $(2k, 2k+1)$ masih terdistribusi secara heterogen wajar sebagaimana karakteristik citra alami. Pada steganografi LSB teracak (PRNG) dengan payload kecil, perubahan bit tersebar sangat tipis sehingga nilai $\chi^2$ global tetap tampak normal. Evaluasi forensik dipadukan dengan inspeksi visual Bit-0 Plane dan analisis komparasi dual-citra untuk kepastian mutlak.</p>
         </div>
       </article>
 

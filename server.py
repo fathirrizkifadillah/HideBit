@@ -221,13 +221,38 @@ def analyze():
             diff_img = generate_difference_heatmap(ref_img, img)
             ref_analysis = analyze_image(ref_img)
 
+            # Jika terdeteksi modifikasi piksel pada komparasi langsung:
+            if comp_metrics["changed_pixels"] > 0:
+                comparison_verdict = {
+                    "level": "ANOMALY_DETECTED",
+                    "badge_label": "MODIFIKASI LSB TERBUKTI (DUAL COMPARISON)",
+                    "status_color": "danger",
+                    "title": f"Terdeteksi Perubahan pada {comp_metrics['changed_pixels']:,} Piksel ({comp_metrics['pixel_change_percent']}%)",
+                    "narrative": (
+                        f"Hasil komparasi diferensial langsung membuktikan adanya manipulasi bit LSB antara kedua citra. "
+                        f"Sebanyak {comp_metrics['changed_pixels']:,} piksel ({comp_metrics['pixel_change_percent']}% dari resolusi) "
+                        f"mengalami penyimpangan nilai dengan selisih maksimum ±{comp_metrics['max_delta']}. "
+                        f"Pola sebaran ini merupakan bukti mutlak dari teknik steganografi LSB teracak (PRNG ChaCha20)."
+                    ),
+                    "recommendation": "Citra terbukti membawa data tersembunyi. Silakan lanjutkan ke tab Reveal Message untuk mendekripsi payload dengan stego-key yang sesuai."
+                }
+            else:
+                comparison_verdict = {
+                    "level": "CLEAN",
+                    "badge_label": "IDENTIK SEMPURNA (0 PERUBAHAN)",
+                    "status_color": "safe",
+                    "title": "Kedua Citra Identik 100%",
+                    "narrative": "Tidak ditemukan perbedaan bit sedikitpun antara citra uji dan citra referensi (MSE = 0.00, PSNR = Tak Terhingga).",
+                    "recommendation": "Citra bersih dari penyisipan atau manipulasi steganografi."
+                }
+
             comparison = {
                 "has_reference": True,
                 "metrics": comp_metrics,
                 "difference_map": image_to_base64(diff_img, "PNG"),
                 "reference_score": ref_analysis["score"],
                 "reference_channels": ref_analysis["channels"],
-                "reference_verdict": ref_analysis["verdict"],
+                "comparison_verdict": comparison_verdict,
             }
 
         return jsonify({

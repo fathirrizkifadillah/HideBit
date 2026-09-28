@@ -246,6 +246,17 @@ function setupAnalysisModeTabs() {
     if (dropLabel) dropLabel.textContent = "Upload Citra Stego";
     if (btnText) btnText.textContent = "Bandingkan Citra Asli vs Stego";
   });
+
+  // Toggle Panduan Forensik (Apa yang Dianalisis & Apa Bedanya)
+  const guideBtn = document.getElementById("guideToggleBtn");
+  const guideContent = document.getElementById("guideContent");
+  const guideIcon = document.getElementById("guideToggleIcon");
+  if (guideBtn && guideContent) {
+    guideBtn.addEventListener("click", () => {
+      guideContent.classList.toggle("hidden");
+      if (guideIcon) guideIcon.classList.toggle("open");
+    });
+  }
 }
 setupAnalysisModeTabs();
 
@@ -645,7 +656,12 @@ async function handleSteganalysis() {
     document.getElementById("scoreRing").style.background = `conic-gradient(${ringColor} ${score * 3.6}deg, #344142 0deg)`;
 
     // 2. Render Vonis Forensik Komprehensif
-    const verdict = data.verdict || {};
+    // Jika Mode Komparasi aktif dan ada hasil komparasi, prioritaskan vonis komparasi
+    let verdict = data.verdict || {};
+    if (state.analysisMode === "compare" && data.comparison && data.comparison.comparison_verdict) {
+      verdict = data.comparison.comparison_verdict;
+    }
+
     const verdictCard = document.getElementById("forensicVerdictCard");
     const verdictBanner = document.getElementById("verdictBanner");
     const verdictBadge = document.getElementById("verdictBadge");
@@ -677,7 +693,10 @@ async function handleSteganalysis() {
     // 3. Render Komparasi Citra (Jika Mode Komparasi Aktif)
     const compPanel = document.getElementById("compareMetricsPanel");
     if (data.comparison && data.comparison.has_reference) {
-      if (compPanel) compPanel.classList.remove("hidden");
+      if (compPanel) {
+        compPanel.classList.remove("hidden");
+        compPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
       const m = data.comparison.metrics || {};
       const psnrEl = document.getElementById("compPsnr");
       const mseEl = document.getElementById("compMse");
@@ -696,33 +715,34 @@ async function handleSteganalysis() {
       if (compPanel) compPanel.classList.add("hidden");
     }
 
-    // 4. Update Tabel Chi-Square per kanal (dengan Status Anomali)
+    // 4. Update Tabel Chi-Square per kanal (Statistik Matematis PoV)
     const ch = data.channels || {};
-    const rows = [
-      ["red", "Red", ch.red?.chi_square, ch.red?.degrees_of_freedom, ch.red?.p_value],
-      ["green", "Green", ch.green?.chi_square, ch.green?.degrees_of_freedom, ch.green?.p_value],
-      ["blue", "Blue", ch.blue?.chi_square, ch.blue?.degrees_of_freedom, ch.blue?.p_value],
+    const channelRows = [
+      ["red", "Red", ch.red],
+      ["green", "Green", ch.green],
+      ["blue", "Blue", ch.blue],
     ];
 
-    document.getElementById("channelRows").innerHTML = rows.map(([color, name, chi, dof, p]) => {
-      const chiStr = typeof chi === "number" ? chi.toFixed(2) : "--";
-      const dofStr = dof !== undefined ? dof : "--";
-      const pStr = typeof p === "number" ? p.toFixed(4) : "--";
+    document.getElementById("channelRows").innerHTML = channelRows.map(([color, name, c]) => {
+      const chiStr = typeof c?.chi_square === "number" ? c.chi_square.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "--";
+      const dofStr = c?.degrees_of_freedom !== undefined ? c.degrees_of_freedom : "--";
+      const pStr = c?.p_value_display || (typeof c?.p_value === "number" ? (c.p_value < 0.0001 ? "< 0.0001" : c.p_value.toFixed(4)) : "--");
+      const balStr = typeof c?.balance_percent === "number" ? `${c.balance_percent}%` : "--";
       
+      const st = c?.status || "Normal";
       let statusBadge = '<span class="status-pill safe">Normal</span>';
-      if (typeof p === "number") {
-        if (p >= 0.85) {
-          statusBadge = '<span class="status-pill danger">Anomali</span>';
-        } else if (p >= 0.45) {
-          statusBadge = '<span class="status-pill warn">Moderat</span>';
-        }
+      if (st === "Anomali") {
+        statusBadge = '<span class="status-pill danger">Anomali</span>';
+      } else if (st === "Moderat") {
+        statusBadge = '<span class="status-pill warn">Moderat</span>';
       }
 
       return `<tr>
         <td><i class="channel-dot ${color}"></i> ${name}</td>
         <td>${chiStr}</td>
         <td>${dofStr}</td>
-        <td>${pStr}</td>
+        <td><span style="font-family:'Space Grotesk',monospace;font-weight:600">${pStr}</span></td>
+        <td>${balStr}</td>
         <td>${statusBadge}</td>
       </tr>`;
     }).join("");
@@ -808,14 +828,15 @@ ${r.verdict.recommendation || "--"}
 ------------------------------------------------------------------------
 PROFIL STATISTIK PASANGAN NILAI (PoV) CHI-SQUARE:
 ------------------------------------------------------------------------
-Kanal Red   : Chi2 = ${ch.red?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.red?.degrees_of_freedom ?? "--"}, p-value = ${ch.red?.p_value?.toFixed(4) ?? "--"}
-Kanal Green : Chi2 = ${ch.green?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.green?.degrees_of_freedom ?? "--"}, p-value = ${ch.green?.p_value?.toFixed(4) ?? "--"}
-Kanal Blue  : Chi2 = ${ch.blue?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.blue?.degrees_of_freedom ?? "--"}, p-value = ${ch.blue?.p_value?.toFixed(4) ?? "--"}
+Kanal Red   : Chi2 = ${ch.red?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.red?.degrees_of_freedom ?? "--"}, p-value = ${ch.red?.p_value_display ?? (ch.red?.p_value < 0.0001 ? "< 0.0001" : ch.red?.p_value?.toFixed(4))}, Simetri PoV = ${ch.red?.balance_percent ?? "--"}% [${ch.red?.status ?? "Normal"}]
+Kanal Green : Chi2 = ${ch.green?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.green?.degrees_of_freedom ?? "--"}, p-value = ${ch.green?.p_value_display ?? (ch.green?.p_value < 0.0001 ? "< 0.0001" : ch.green?.p_value?.toFixed(4))}, Simetri PoV = ${ch.green?.balance_percent ?? "--"}% [${ch.green?.status ?? "Normal"}]
+Kanal Blue  : Chi2 = ${ch.blue?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.blue?.degrees_of_freedom ?? "--"}, p-value = ${ch.blue?.p_value_display ?? (ch.blue?.p_value < 0.0001 ? "< 0.0001" : ch.blue?.p_value?.toFixed(4))}, Simetri PoV = ${ch.blue?.balance_percent ?? "--"}% [${ch.blue?.status ?? "Normal"}]
 
 Keterangan Ilmiah:
-Substitusi bit LSB secara acak (misal ciphertext AES-256) memaksakan
-kesetimbangan frekuensi nilai piksel genap (2k) dan ganjil (2k+1).
-Kanal dengan p-value mendekati 1.00 mengindikasikan anomali manipulasi LSB.
+Uji Chi-Square Pairs of Values (PoV) mengukur apakah frekuensi pasangan nilai piksel (2k, 2k+1)
+terdistribusi secara wajar (heterogen alami). Pada steganografi LSB teracak (PRNG) dengan muatan
+kecil, nilai Chi-Square global tetap tinggi (p-value teoretis < 0.0001) karena modifikasi bit
+tersebar tipis, sehingga dianalisis bersama inspeksi visual Bit-0 Plane dan uji komparasi citra asli.
 ${compSection}
 ========================================================================
   Diverifikasi oleh Engine Forensik HideBit - Keamanan Informasi & Kriptografi

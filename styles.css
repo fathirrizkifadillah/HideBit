@@ -79,6 +79,23 @@
 .diff-stats-note b{color:var(--ink)}
 .diff-stats-note span{font-weight:700;color:var(--teal-dark)}
 
+/* Forensic Method Guide Card */
+.method-guide-card{margin-bottom:22px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fbfdfc}
+.guide-header{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#fff;border-bottom:1px solid var(--line);transition:background .15s ease}
+.guide-header:hover{background:#f8faf9}
+.guide-title-wrap{display:flex;align-items:center;gap:12px}
+.guide-badge{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--teal-dark);background:var(--teal-pale);padding:3px 8px;border-radius:4px;text-transform:uppercase}
+.guide-header h4{margin:0;font-size:14px;color:var(--ink);font-family:"Space Grotesk",sans-serif;font-weight:700}
+.guide-toggle-icon{font-size:12px;color:var(--muted);transition:transform .2s ease}
+.guide-toggle-icon.open{transform:rotate(180deg)}
+.guide-content{padding:18px 20px}
+.guide-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:850px){.guide-grid{grid-template-columns:1fr}}
+.guide-col{background:#fff;border:1px solid var(--line);border-radius:9px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.guide-col h5{margin:0;font-size:13px;color:var(--teal-dark);font-family:"Space Grotesk",sans-serif;font-weight:700}
+.guide-col p{margin:0;font-size:12px;color:#526061;line-height:1.5}
+.guide-col p b{color:var(--ink)}
+
 /* Analysis Mode Selector */
 .analysis-mode-selector{display:flex;gap:8px;margin-bottom:22px;background:#edf2f1;padding:5px;border-radius:10px;border:1px solid var(--line);max-width:520px}
 .analysis-mode-tab{flex:1;padding:10px 16px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s ease;text-align:center}
