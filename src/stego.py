@@ -96,10 +96,10 @@ def embed_payload(
     flat_pixels = pixel_array.flatten()
     total_slots = flat_pixels.shape[0]
     
-    # 3. Buat permutasi urutan piksel acak berdasarkan stego-key
+    # 3. Buat permutasi urutan piksel acak berdasarkan stego-key (uint32 hemat memori)
     seed_int = derive_seed_from_key(stego_key)
     rng = np.random.default_rng(seed_int)
-    shuffled_indices = rng.permutation(total_slots)
+    shuffled_indices = rng.permutation(np.arange(total_slots, dtype=np.uint32))
     
     # 4. Ambil indeks sebanyak bit yang ingin disisipkan
     chosen_indices = shuffled_indices[:total_bits]
@@ -133,10 +133,10 @@ def extract_payload(
     flat_pixels = pixel_array.flatten()
     total_slots = flat_pixels.shape[0]
     
-    # 1. Bangkitkan permutasi PRNG yang sama dengan stego-key
+    # 1. Bangkitkan permutasi PRNG yang sama dengan stego-key (uint32 hemat memori)
     seed_int = derive_seed_from_key(stego_key)
     rng = np.random.default_rng(seed_int)
-    shuffled_indices = rng.permutation(total_slots)
+    shuffled_indices = rng.permutation(np.arange(total_slots, dtype=np.uint32))
     
     # 2. Ekstrak Header (64 bit pertama)
     header_indices = shuffled_indices[:HEADER_BITS]

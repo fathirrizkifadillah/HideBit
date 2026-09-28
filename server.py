@@ -57,6 +57,9 @@ def check_capacity():
     file = request.files["image"]
     try:
         img = Image.open(file.stream).convert("RGB")
+        max_dim = 1600
+        if img.width > max_dim or img.height > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
         cap = get_image_capacity(img)
         return jsonify({"success": True, "capacity": cap})
     except Exception as e:
@@ -87,6 +90,9 @@ def embed():
     try:
         cover_file = request.files["cover"]
         cover_img = Image.open(cover_file.stream).convert("RGB")
+        max_dim = 1600
+        if cover_img.width > max_dim or cover_img.height > max_dim:
+            cover_img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
         capacity = get_image_capacity(cover_img)
 
         # 1. Enkripsi payload dengan AES-256-GCM + PBKDF2 (kompresi adaptif zlib)

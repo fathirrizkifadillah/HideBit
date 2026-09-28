@@ -54,6 +54,43 @@ function imageMeta(file, image, capacityBytes = 0) {
   return `<strong>${file.name}</strong><span>${image.width} x ${image.height}px · ${formatBytes(file.size)}${capStr}</span>`;
 }
 
+function optimizeCoverImage(file, image, callback) {
+  const maxDim = 1280;
+  if (image.width <= maxDim && image.height <= maxDim) {
+    callback(file, image, URL.createObjectURL(file));
+    return;
+  }
+
+  let w = image.width;
+  let h = image.height;
+  if (w > h) {
+    h = Math.round((h * maxDim) / w);
+    w = maxDim;
+  } else {
+    w = Math.round((w * maxDim) / h);
+    h = maxDim;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(image, 0, 0, w, h);
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      callback(file, image, URL.createObjectURL(file));
+      return;
+    }
+    const cleanName = file.name.replace(/\.[^/.]+$/, "") + ".png";
+    const optimizedFile = new File([blob], cleanName, { type: "image/png" });
+    const newUrl = URL.createObjectURL(blob);
+    const newImg = new Image();
+    newImg.onload = () => callback(optimizedFile, newImg, newUrl);
+    newImg.src = newUrl;
+  }, "image/png");
+}
+
 function setupImagePicker({
   inputId,
   dropId,
@@ -101,37 +138,51 @@ function setupImagePicker({
     if (!file) return;
 
     readImage(file, async (image, url) => {
-      state[`${kind}File`] = file;
-      state[`${kind}Url`] = url;
+      const applySelection = (finalFile, finalImg, finalUrl) => {
+        state[`${kind}File`] = finalFile;
+        state[`${kind}Url`] = finalUrl;
 
-      // 1. Tampilkan thumbnail gambar seketika
-      if (thumb) thumb.src = url;
-      if (meta) meta.innerHTML = imageMeta(file, image);
-      if (drop) drop.classList.add("hidden");
-      if (card) card.classList.remove("hidden");
+        // 1. Tampilkan thumbnail gambar seketika
+        if (thumb) thumb.src = finalUrl;
+        if (meta) meta.innerHTML = imageMeta(finalFile, finalImg);
+        if (drop) drop.classList.add("hidden");
+        if (card) card.classList.remove("hidden");
 
-      if (kind === "cover") {
-        const cp = document.getElementById("coverPreview");
-        if (cp) cp.innerHTML = `<img src="${url}" alt="Cover image preview">`;
-        const sz = document.getElementById("resultImageSize");
-        if (sz) sz.textContent = `${image.width} x ${image.height}px`;
+        if (kind === "cover") {
+          const cp = document.getElementById("coverPreview");
+          if (cp) cp.innerHTML = `<img src="${finalUrl}" alt="Cover image preview">`;
+          const sz = document.getElementById("resultImageSize");
+          if (sz) sz.textContent = `${finalImg.width} x ${finalImg.height}px`;
 
-        // Request kapasitas riil ke backend
+          // Request kapasitas riil ke backend
+          fetchCapacity(finalFile, finalImg);
+        }
+      };
+
+      const fetchCapacity = async (finalFile, finalImg) => {
         try {
           const fd = new FormData();
-          fd.append("image", file);
+          fd.append("image", finalFile);
           const res = await fetch("/api/capacity", { method: "POST", body: fd });
           const json = await res.json();
           if (json.success) {
             state.capacityBytes = json.capacity.max_payload_bytes;
-            if (meta) meta.innerHTML = imageMeta(file, image, state.capacityBytes);
+            if (meta) meta.innerHTML = imageMeta(finalFile, finalImg, state.capacityBytes);
             updateCapacity();
           }
         } catch (err) {
           console.warn("Gagal mengecek kapasitas backend:", err);
-          state.capacityBytes = Math.max(0, Math.floor((image.width * image.height * 3 - 64) / 8));
+          state.capacityBytes = Math.max(0, Math.floor((finalImg.width * finalImg.height * 3 - 64) / 8));
           updateCapacity();
         }
+      };
+
+      if (kind === "cover" && (image.width > 1280 || image.height > 1280)) {
+        optimizeCoverImage(file, image, (optFile, optImg, optUrl) => {
+          applySelection(optFile, optImg, optUrl);
+        });
+      } else {
+        applySelection(file, image, url);
       }
     });
   });
