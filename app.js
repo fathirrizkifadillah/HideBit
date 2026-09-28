@@ -22,6 +22,8 @@ const state = {
   analysisMode: "blind", // "blind" | "compare"
   revealedBlobUrl: null,
   lastAnalysisReport: null,
+  lastLsbData: null,
+  lsbViewMode: "side-by-side",
 };
 
 function setRoute(route) {
@@ -259,6 +261,100 @@ function setupAnalysisModeTabs() {
   }
 }
 setupAnalysisModeTabs();
+
+// Render dan Kontrol Tampilan Visual LSB Planes (Mode Mandiri vs Dual Komparasi)
+function renderLsbPlanes() {
+  const grid = document.getElementById("lsbGrid");
+  const toggleWrap = document.getElementById("lsbViewToggleWrap");
+  if (!grid || !state.lastLsbData?.stego) return;
+
+  const stegoPlanes = state.lastLsbData.stego;
+  const coverPlanes = state.lastLsbData.cover;
+  const hasCover = Boolean(coverPlanes);
+
+  if (toggleWrap) {
+    if (hasCover) {
+      toggleWrap.classList.remove("hidden");
+    } else {
+      toggleWrap.classList.add("hidden");
+    }
+  }
+
+  const channels = [
+    { key: "red", name: "Kanal Merah (R)", color: "red" },
+    { key: "green", name: "Kanal Hijau (G)", color: "green" },
+    { key: "blue", name: "Kanal Biru (B)", color: "blue" },
+  ];
+
+  if (hasCover && state.lsbViewMode === "side-by-side") {
+    grid.innerHTML = channels.map((ch) => `
+      <div class="lsb-card dual">
+        <div class="lsb-card-heading">
+          <i class="channel-dot ${ch.color}"></i>
+          <strong>${ch.name}</strong>
+        </div>
+        <div class="lsb-dual-grid">
+          <div class="lsb-sub-item">
+            <span class="lsb-tag cover">Cover Asli</span>
+            <div class="lsb-img">
+              <img src="${coverPlanes[ch.key]}" alt="Cover ${ch.name}">
+            </div>
+          </div>
+          <div class="lsb-sub-item">
+            <span class="lsb-tag stego">Stego (Disisipi)</span>
+            <div class="lsb-img">
+              <img src="${stegoPlanes[ch.key]}" alt="Stego ${ch.name}">
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join("");
+  } else {
+    // Mode tunggal: tampilkan hanya Stego atau hanya Cover
+    const activePlanes = (state.lsbViewMode === "cover" && hasCover) ? coverPlanes : stegoPlanes;
+    const tagLabel = (state.lsbViewMode === "cover" && hasCover) ? "Citra Cover Asli" : (hasCover ? "Citra Stego (Disisipi)" : "Bidang Bit-0");
+
+    grid.innerHTML = channels.map((ch) => `
+      <div class="lsb-card">
+        <div class="lsb-img">
+          <img src="${activePlanes[ch.key]}" alt="${ch.name}">
+        </div>
+        <span>${ch.name} <small style="display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:3px">${tagLabel}</small></span>
+      </div>
+    `).join("");
+  }
+}
+
+function setupLsbViewToggles() {
+  const btnSide = document.getElementById("btnLsbSideBySide");
+  const btnStego = document.getElementById("btnLsbStegoOnly");
+  const btnCover = document.getElementById("btnLsbCoverOnly");
+  const tabs = [btnSide, btnStego, btnCover];
+
+  if (!btnSide || !btnStego || !btnCover) return;
+
+  btnSide.addEventListener("click", () => {
+    state.lsbViewMode = "side-by-side";
+    tabs.forEach((t) => t?.classList.remove("active"));
+    btnSide.classList.add("active");
+    renderLsbPlanes();
+  });
+
+  btnStego.addEventListener("click", () => {
+    state.lsbViewMode = "stego";
+    tabs.forEach((t) => t?.classList.remove("active"));
+    btnStego.classList.add("active");
+    renderLsbPlanes();
+  });
+
+  btnCover.addEventListener("click", () => {
+    state.lsbViewMode = "cover";
+    tabs.forEach((t) => t?.classList.remove("active"));
+    btnCover.classList.add("active");
+    renderLsbPlanes();
+  });
+}
+setupLsbViewToggles();
 
 
 // Setup Secret File Picker
@@ -772,14 +868,13 @@ async function handleSteganalysis() {
       </tr>`;
     }).join("");
 
-    // 5. Render Visual LSB Planes
+    // 5. Render Visual LSB Planes (Mendukung Dual Komparasi Cover vs Stego)
     if (data.lsb_planes) {
-      const rEl = document.getElementById("lsbRed");
-      const gEl = document.getElementById("lsbGreen");
-      const bEl = document.getElementById("lsbBlue");
-      if (rEl && data.lsb_planes.red) rEl.innerHTML = `<img src="${data.lsb_planes.red}" alt="Red LSB Plane">`;
-      if (gEl && data.lsb_planes.green) gEl.innerHTML = `<img src="${data.lsb_planes.green}" alt="Green LSB Plane">`;
-      if (bEl && data.lsb_planes.blue) bEl.innerHTML = `<img src="${data.lsb_planes.blue}" alt="Blue LSB Plane">`;
+      state.lastLsbData = {
+        stego: data.lsb_planes,
+        cover: data.comparison?.reference_lsb_planes || null,
+      };
+      renderLsbPlanes();
     }
 
     // Simpan objek laporan untuk ekspor berkas .txt

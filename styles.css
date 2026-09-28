@@ -9,6 +9,23 @@
 .lsb-card span{display:block;margin-top:10px;font-size:12px;font-weight:600;color:var(--ink)}
 .lsb-img{width:100%;aspect-ratio:1;background:#eef2f1;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#8b9695;font-size:12px}
 .lsb-img img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+
+/* LSB View Mode Toggles */
+.lsb-view-toggles{display:flex;gap:6px;background:#edf2f1;padding:3px;border-radius:8px;border:1px solid var(--line)}
+.lsb-view-tab{padding:5px 12px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-family:"DM Sans",sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s ease}
+.lsb-view-tab:hover{color:var(--ink)}
+.lsb-view-tab.active{background:#fff;color:var(--teal-dark);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* LSB Dual Grid inside Card */
+.lsb-card-heading{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px}
+.lsb-card-heading strong{font-family:"Space Grotesk",sans-serif;font-size:13px;color:var(--ink)}
+.lsb-dual-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lsb-sub-item{display:flex;flex-direction:column;gap:5px;align-items:center}
+.lsb-sub-item .lsb-img{width:100%;aspect-ratio:1}
+.lsb-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:4px}
+.lsb-tag.cover{background:#e2e8f0;color:#334155}
+.lsb-tag.stego{background:#fee2e2;color:#991b1b}
+
 .diff-preview{background:#0e1315!important;border:1px solid #233133!important;color:#6ed7cb!important;font-weight:700}
 
 /* Visuals Row (3 Kolom Pratinjau Citra Bersih & Rapi) */

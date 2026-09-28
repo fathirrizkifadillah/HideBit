@@ -252,12 +252,21 @@ def analyze():
                     "recommendation": "Citra bersih dari penyisipan atau manipulasi steganografi."
                 }
 
+            ref_red_lsb = lsb_plane(ref_img, channel=0)
+            ref_green_lsb = lsb_plane(ref_img, channel=1)
+            ref_blue_lsb = lsb_plane(ref_img, channel=2)
+
             comparison = {
                 "has_reference": True,
                 "metrics": comp_metrics,
                 "difference_map": image_to_base64(diff_img, "PNG"),
                 "reference_score": ref_analysis["score"],
                 "reference_channels": ref_analysis["channels"],
+                "reference_lsb_planes": {
+                    "red": image_to_base64(ref_red_lsb, "PNG"),
+                    "green": image_to_base64(ref_green_lsb, "PNG"),
+                    "blue": image_to_base64(ref_blue_lsb, "PNG")
+                },
                 "comparison_verdict": comparison_verdict,
             }
 
