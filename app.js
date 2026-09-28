@@ -360,21 +360,46 @@ function resetHide() {
   if (dp) dp.innerHTML = '<span class="placeholder-text">Peta Sebaran PRNG</span>';
 }
 
-// Helper fetch dengan penanganan cold-start, timeout, dan error JSON yang aman
-async function safeFetchJson(url, options = {}) {
-  const res = await fetch(url, options);
-  const text = await res.text();
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch (err) {
-    if (res.status === 502 || res.status === 504 || !text) {
-      throw new Error("Server Cloud Render sedang 'cold start' (memulai ulang) atau koneksi timeout. Silakan klik tombol sekali lagi dalam beberapa detik.");
+// Helper fetch dengan penanganan auto-retry pada cold-start/502 dan error JSON yang aman
+async function safeFetchJson(url, options = {}, retries = 3, delayMs = 3500) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+        return data;
+      } catch (parseErr) {
+        if (res.status === 502 || res.status === 503 || res.status === 504 || !text) {
+          if (attempt < retries) {
+            console.warn(`[SafeFetch] Server Render sedang proses wake-up (attempt ${attempt}/${retries}). Menunggu ${delayMs / 1000}s...`);
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
+          throw new Error("Server Cloud Render sedang 'cold start' (memulai ulang). Silakan klik tombol sekali lagi dalam beberapa detik.");
+        }
+        throw new Error(`Respons server tidak valid (HTTP ${res.status}): ${text.slice(0, 100)}`);
+      }
+    } catch (netErr) {
+      if (attempt < retries) {
+        console.warn(`[SafeFetch] Network retry (attempt ${attempt}/${retries})...`);
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue;
+      }
+      throw netErr;
     }
-    throw new Error(`Respons server tidak valid (HTTP ${res.status}): ${text.slice(0, 100)}`);
   }
-  return data;
 }
+
+// Keep-Alive Heartbeat: Mencegah server Render tidur (spin-down) selama halaman web terbuka
+function setupKeepAlive() {
+  const PING_INTERVAL = 9 * 60 * 1000; // Tiap 9 menit (Render tidur otomatis setelah 15 menit)
+  setInterval(() => {
+    fetch("/health").catch(() => {});
+  }, PING_INTERVAL);
+}
+setupKeepAlive();
 
 async function handleHideMessage() {
   const key = document.getElementById("hideKey").value.trim();

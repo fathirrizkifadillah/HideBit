@@ -42,6 +42,12 @@ def serve_static(filename):
     return send_from_directory(BASE_DIR, filename)
 
 
+@app.route("/health")
+def health_check():
+    """Health check & keep-alive ping endpoint."""
+    return jsonify({"status": "ok", "service": "HideBit"}), 200
+
+
 @app.route("/api/capacity", methods=["POST"])
 def check_capacity():
     """Menghitung kapasitas maksimum muatan gambar cover."""
