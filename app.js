@@ -643,7 +643,6 @@ async function handleSteganalysis() {
     if (score >= 65) ringColor = "var(--red)";
     else if (score >= 35) ringColor = "var(--yellow)";
     document.getElementById("scoreRing").style.background = `conic-gradient(${ringColor} ${score * 3.6}deg, #344142 0deg)`;
-    stateLabel.textContent = "Analisis selesai";
 
     // 2. Render Vonis Forensik Komprehensif
     const verdict = data.verdict || {};
