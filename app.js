@@ -349,6 +349,22 @@ function resetHide() {
   if (dp) dp.innerHTML = '<span class="placeholder-text">Peta Sebaran PRNG</span>';
 }
 
+// Helper fetch dengan penanganan cold-start, timeout, dan error JSON yang aman
+async function safeFetchJson(url, options = {}) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    if (res.status === 502 || res.status === 504 || !text) {
+      throw new Error("Server Cloud Render sedang 'cold start' (memulai ulang) atau koneksi timeout. Silakan klik tombol sekali lagi dalam beberapa detik.");
+    }
+    throw new Error(`Respons server tidak valid (HTTP ${res.status}): ${text.slice(0, 100)}`);
+  }
+  return data;
+}
+
 async function handleHideMessage() {
   const key = document.getElementById("hideKey").value.trim();
 
@@ -384,12 +400,10 @@ async function handleHideMessage() {
   setRoute("processing");
 
   try {
-    const res = await fetch("/api/embed", {
+    const data = await safeFetchJson("/api/embed", {
       method: "POST",
       body: formData,
     });
-
-    const data = await res.json();
 
     if (!data.success) {
       alert("Proses Embedding Gagal: " + (data.error || "Unknown error"));
@@ -510,12 +524,10 @@ async function handleRevealMessage() {
     formData.append("stego", state.stegoFile);
     formData.append("key", key);
 
-    const res = await fetch("/api/extract", {
+    const data = await safeFetchJson("/api/extract", {
       method: "POST",
       body: formData,
     });
-
-    const data = await res.json();
 
     if (data.success) {
       errorBanner.classList.add("hidden");
@@ -598,9 +610,12 @@ async function handleSteganalysis() {
   }
 
   const analyzeBtn = document.getElementById("analyzeButton");
-  const stateLabel = document.getElementById("analysisState");
+  const origBtnHtml = analyzeBtn.innerHTML;
+  const progressBanner = document.getElementById("analysisProgressBanner");
+  
   analyzeBtn.disabled = true;
-  stateLabel.textContent = "Menganalisis anomali statistik...";
+  analyzeBtn.innerHTML = `<span>Menganalisis Forensik...</span> <div class="spinner-sm"></div>`;
+  if (progressBanner) progressBanner.classList.remove("hidden");
 
   try {
     const formData = new FormData();
@@ -609,16 +624,13 @@ async function handleSteganalysis() {
       formData.append("reference", state.referenceFile);
     }
 
-    const res = await fetch("/api/analyze", {
+    const data = await safeFetchJson("/api/analyze", {
       method: "POST",
       body: formData,
     });
 
-    const data = await res.json();
-
     if (!data.success) {
       alert("Analisis gagal: " + (data.error || "Unknown error"));
-      stateLabel.textContent = "Analisis gagal";
       return;
     }
 
@@ -743,9 +755,10 @@ async function handleSteganalysis() {
 
   } catch (err) {
     alert("Gagal melakukan analisis steganalisis: " + err.message);
-    stateLabel.textContent = "Terjadi kesalahan";
   } finally {
     analyzeBtn.disabled = false;
+    analyzeBtn.innerHTML = origBtnHtml;
+    if (progressBanner) progressBanner.classList.add("hidden");
   }
 }
 

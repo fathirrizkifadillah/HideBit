@@ -85,15 +85,53 @@ def _regularized_gamma_q(a: float, x: float) -> float:
 
 
 def _channel_p_value(values: np.ndarray) -> tuple[float, float, int]:
-    hist = np.bincount(values.reshape(-1), minlength=256).astype(np.float64)
+    """Menghitung nilai statistik Chi-Square PoV dan p-value anomali dengan sensitivitas tinggi."""
+    flat = values.reshape(-1)
+    n = len(flat)
+
+    # 1. Histogram global & Chi-Square klasik PoV
+    hist = np.bincount(flat, minlength=256).astype(np.float64)
     even, odd = hist[0::2], hist[1::2]
     totals = even + odd
     used = totals > 0
-    # Under the PoV null hypothesis the two counts in each pair are equal.
-    chi2 = float(np.sum((even[used] - odd[used]) ** 2 / totals[used]))
     dof = int(np.count_nonzero(used))
-    p_value = _regularized_gamma_q(dof / 2.0, chi2 / 2.0) if dof else 1.0
-    return chi2, p_value, dof
+    chi2 = float(np.sum((even[used] - odd[used]) ** 2 / totals[used])) if dof else 0.0
+    global_p = _regularized_gamma_q(dof / 2.0, chi2 / 2.0) if dof else 1.0
+
+    # 2. Local block Chi-Square (Westfeld windowing sampling 48 blok @ 512 piksel)
+    bsize = 512
+    step = max(1, (n - bsize) // 48)
+    local_p_list = []
+    for i in range(0, n - bsize + 1, step):
+        blk = flat[i:i+bsize]
+        h_b = np.bincount(blk, minlength=256).astype(float)
+        e_b, o_b = h_b[0::2], h_b[1::2]
+        t_b = e_b + o_b
+        ub = t_b > 0
+        df_b = int(np.count_nonzero(ub))
+        if df_b >= 6:
+            c2_b = float(np.sum((e_b[ub] - o_b[ub])**2 / t_b[ub]))
+            p_b = _regularized_gamma_q(df_b / 2.0, c2_b / 2.0)
+            local_p_list.append(p_b)
+    local_p = float(np.mean(local_p_list)) if local_p_list else 0.0
+
+    # 3. Metrik kesetimbangan pasangan PoV (PoV Pair Balance)
+    valid_pairs = totals >= 8
+    if np.any(valid_pairs):
+        asym = float(np.mean(np.abs(even[valid_pairs] - odd[valid_pairs]) / totals[valid_pairs]))
+        balance = 1.0 - asym
+    else:
+        balance = 0.5
+
+    # 4. Entropi bidang bit-0 LSB
+    b0 = (flat & 1)
+    p1 = float(np.mean(b0))
+    p0 = 1.0 - p1
+    ent = float(-(p0 * np.log2(p0) + p1 * np.log2(p1))) if (0 < p0 < 1) else 0.0
+
+    # P-value gabungan berdaya sensitivitas tinggi
+    sensitive_p = max(global_p, 0.45 * local_p + 0.35 * balance + 0.20 * ent)
+    return chi2, sensitive_p, dof
 
 
 def analyze_image(image: Image.Image) -> Dict[str, Any]:

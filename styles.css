@@ -144,4 +144,9 @@
 .key-strength-bar.strong{width:80%;background:var(--teal)}
 .key-strength-bar.very-strong{width:100%;background:#10b981}
 .key-strength-hint{margin:6px 0 0 0;font-size:11px;color:var(--muted);line-height:1.4}
+
+/* Analysis Loading State */
+.spinner-sm{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;display:inline-block;vertical-align:middle;animation:spin .8s linear infinite;margin-left:8px}
+.analysis-progress-banner{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#e6fffa;border:1px solid #7ed3c1;border-radius:9px;margin-top:14px;color:#0d7a6e;font-size:13px;font-weight:600;animation:rise .25s ease both}
+.analysis-progress-banner span{color:#0d7a6e}
 
