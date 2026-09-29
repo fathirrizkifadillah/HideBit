@@ -244,7 +244,7 @@ def analyze():
                         f"Hasil komparasi diferensial langsung membuktikan adanya manipulasi bit LSB antara kedua citra. "
                         f"Sebanyak {comp_metrics['changed_pixels']:,} piksel ({comp_metrics['pixel_change_percent']}% dari resolusi) "
                         f"mengalami penyimpangan nilai dengan selisih maksimum ±{comp_metrics['max_delta']}. "
-                        f"Pola sebaran ini merupakan bukti mutlak dari teknik steganografi LSB teracak (PRNG ChaCha20)."
+                        f"Pola sebaran ini merupakan karakteristik khas dari teknik steganografi LSB teracak (PRNG berbasis seed stego-key)."
                     ),
                     "recommendation": "Citra terbukti membawa data tersembunyi. Silakan lanjutkan ke tab Reveal Message untuk mendekripsi payload dengan stego-key yang sesuai."
                 }
