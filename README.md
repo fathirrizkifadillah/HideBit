@@ -1,8 +1,23 @@
 # HideBit — Secure Image Steganography & Steganalysis
 
-Aplikasi web terintegrasi untuk **Steganografi Citra LSB Teracak (PRNG)** dengan **Kriptografi Terotentikasi (AES-256-GCM)** dan **Detektor Steganalisis (Chi-Square PoV & Visual LSB Plane)**.
+Aplikasi web terintegrasi untuk **Steganografi Citra LSB Teracak (PRNG)** dengan **Kriptografi Terotentikasi (AES-256-GCM)** dan **Detektor Steganalisis Forensik (Chi-Square PoV & Visual LSB Plane)**.
 
-Proyek ini dibangun untuk memenuhi tugas **UTS Keamanan Informasi**.
+Proyek ini dibangun untuk memenuhi tugas **UTS Praktikum Keamanan Informasi (Topik B: Aplikasi Steganografi)**.
+
+---
+
+## 👥 Tim Pengembang
+* **Program Studi Informatika — Fakultas Teknik, Universitas Siliwangi (2026)**
+* **Dosen Pengampu:** Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.
+
+| No | Nama Mahasiswa | NPM | Peran / Kontribusi |
+| :-: | :--- | :-: | :--- |
+| 1 | **Fathir Rizki Fadillah** | 247006111129 | *Ketua Kelompok* (Fullstack Dev & Integrasi Sistem) |
+| 2 | **Aria Muhammad Fahlevi** | 247006111131 | *Anggota* (Pengujian Data & Evaluasi Metrik) |
+| 3 | **Moh Raya Alfareza Alban** | 247006111133 | *Anggota* (Dokumentasi Laporan & Desain UI) |
+
+🌐 **Live Web Application:** [https://hidebit.onrender.com](https://hidebit.onrender.com)  
+📊 **Berkas Data Pengujian:** [`DataPengujian_HideBit.xlsx`](./DataPengujian_HideBit.xlsx)  
 
 ---
 
@@ -39,7 +54,7 @@ pip install -r requirements.txt
 python server.py
 ```
 Aplikasi web akan aktif dan dapat diakses di browser melalui:
-👉 **http://localhost:8080**
+👉 **http://localhost:8000**
 
 ---
 
