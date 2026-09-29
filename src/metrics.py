@@ -89,15 +89,27 @@ def get_image_metrics(cover: Image.Image, stego: Image.Image) -> Dict[str, Any]:
     }
 
 
-def get_histogram_data(image: Image.Image) -> Dict[str, list]:
+def get_histogram_data(image: Image.Image) -> Dict[str, Any]:
     """
-    Menghitung histogram frekuensi 256 nilai intensitas per kanal R, G, B.
+    Menghitung histogram frekuensi 256 nilai intensitas per kanal R, G, B
+    beserta statistik pemusatan (mean dan variance).
     """
     rgb = np.asarray(image.convert("RGB"), dtype=np.uint8)
+    r = rgb[:, :, 0].flatten()
+    g = rgb[:, :, 1].flatten()
+    b = rgb[:, :, 2].flatten()
     return {
-        "r": np.bincount(rgb[:, :, 0].flatten(), minlength=256).tolist(),
-        "g": np.bincount(rgb[:, :, 1].flatten(), minlength=256).tolist(),
-        "b": np.bincount(rgb[:, :, 2].flatten(), minlength=256).tolist(),
+        "r": np.bincount(r, minlength=256).tolist(),
+        "g": np.bincount(g, minlength=256).tolist(),
+        "b": np.bincount(b, minlength=256).tolist(),
+        "stats": {
+            "r_mean": round(float(np.mean(r)), 3),
+            "g_mean": round(float(np.mean(g)), 3),
+            "b_mean": round(float(np.mean(b)), 3),
+            "r_var": round(float(np.var(r)), 2),
+            "g_var": round(float(np.var(g)), 2),
+            "b_var": round(float(np.var(b)), 2),
+        }
     }
 
 

@@ -24,6 +24,9 @@ const state = {
   lastAnalysisReport: null,
   lastLsbData: null,
   lsbViewMode: "side-by-side",
+  lastHistogramData: null,
+  lastRefHistogramData: null,
+  histogramChannel: "all",
 };
 
 function setRoute(route) {
@@ -33,6 +36,9 @@ function setRoute(route) {
   navItems.forEach((item) => item.classList.toggle("active", item.dataset.route === target));
   if (location.hash.slice(1) !== target) {
     history.replaceState(null, "", `#${target}`);
+  }
+  if (target === "analysis" && state.lastHistogramData) {
+    setTimeout(renderHistogramChart, 100);
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -406,6 +412,164 @@ function setupLsbViewToggles() {
   });
 }
 setupLsbViewToggles();
+
+// Render dan Visualisasi Histogram Kanal RGB di HTML5 Canvas
+function renderHistogramChart() {
+  const canvas = document.getElementById("histogramCanvas");
+  if (!canvas || !state.lastHistogramData) return;
+
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const padding = { top: 25, right: 30, bottom: 42, left: 60 };
+  const plotW = width - padding.left - padding.right;
+  const plotH = height - padding.top - padding.bottom;
+
+  // Latar belakang kanvas
+  ctx.fillStyle = "#0e1315";
+  ctx.fillRect(0, 0, width, height);
+
+  // Grid horizontal
+  ctx.strokeStyle = "#1a2527";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#6a7b79";
+  ctx.font = "11px 'DM Sans', sans-serif";
+
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + (plotH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+  }
+
+  // Sumbu X (0, 64, 128, 192, 255)
+  const xTicks = [0, 64, 128, 192, 255];
+  xTicks.forEach((tick) => {
+    const x = padding.left + (tick / 255) * plotW;
+    ctx.beginPath();
+    ctx.moveTo(x, padding.top + plotH);
+    ctx.lineTo(x, padding.top + plotH + 5);
+    ctx.stroke();
+    ctx.textAlign = "center";
+    ctx.fillText(tick, x, padding.top + plotH + 18);
+  });
+  ctx.fillText("Nilai Intensitas Piksel (0 - 255)", padding.left + plotW / 2, padding.top + plotH + 34);
+
+  const stg = state.lastHistogramData;
+  const cov = state.lastRefHistogramData;
+  const hasCover = Boolean(cov);
+
+  const stgLegend = document.getElementById("legendStegoIndicator");
+  if (stgLegend) {
+    stgLegend.style.display = hasCover ? "inline-flex" : "none";
+  }
+
+  // Tentukan batas frekuensi maksimum untuk skala Y
+  let maxVal = 100;
+  const channelsToPlot = state.histogramChannel === "all" ? ["r", "g", "b"] : [state.histogramChannel];
+  channelsToPlot.forEach((ch) => {
+    if (stg && stg[ch]) maxVal = Math.max(maxVal, ...stg[ch]);
+    if (cov && cov[ch]) maxVal = Math.max(maxVal, ...cov[ch]);
+  });
+  maxVal = Math.ceil(maxVal * 1.05);
+
+  // Label sumbu Y
+  ctx.textAlign = "right";
+  ctx.fillText(maxVal.toLocaleString(), padding.left - 8, padding.top + 10);
+  ctx.fillText("0", padding.left - 8, padding.top + plotH);
+
+  const colors = {
+    r: "#e18484",
+    g: "#71ba91",
+    b: "#79a5d1"
+  };
+
+  function drawCurve(bins, strokeColor, isDashed = false) {
+    if (!bins || bins.length !== 256) return;
+    ctx.save();
+    ctx.beginPath();
+    if (isDashed) {
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = hasCover ? "#75d6cb" : strokeColor;
+      ctx.lineWidth = 1.6;
+    } else {
+      ctx.setLineDash([]);
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2.0;
+    }
+
+    for (let i = 0; i < 256; i++) {
+      const x = padding.left + (i / 255) * plotW;
+      const y = padding.top + plotH - (bins[i] / maxVal) * plotH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Gambar kurva Cover (solid) lalu Stego (putus-putus)
+  channelsToPlot.forEach((ch) => {
+    if (hasCover && cov[ch]) {
+      drawCurve(cov[ch], colors[ch], false);
+    }
+    if (stg && stg[ch]) {
+      drawCurve(stg[ch], colors[ch], hasCover);
+    }
+  });
+
+  // Update kartu ringkasan statistik (Mean & Variansi)
+  const updateStatCard = (prefix, chKey, covStats, stgStats) => {
+    const meanEl = document.getElementById(`histMean${prefix}`);
+    const varEl = document.getElementById(`histVar${prefix}`);
+    const deltaEl = document.getElementById(`histDelta${prefix}`);
+
+    const sMean = stgStats?.[`${chKey}_mean`];
+    const sVar = stgStats?.[`${chKey}_var`];
+    const cMean = covStats?.[`${chKey}_mean`];
+    const cVar = covStats?.[`${chKey}_var`];
+
+    if (meanEl) {
+      meanEl.textContent = hasCover && cMean !== undefined ? `${cMean} (Cov) / ${sMean} (Stg)` : (sMean ?? "--");
+    }
+    if (varEl) {
+      varEl.textContent = hasCover && cVar !== undefined ? `${cVar} / ${sVar}` : (sVar ?? "--");
+    }
+    if (deltaEl) {
+      if (hasCover && cMean !== undefined && sMean !== undefined) {
+        const delta = (sMean - cMean).toFixed(4);
+        const sign = delta >= 0 ? "+" : "";
+        deltaEl.textContent = `Δ Mean: ${sign}${delta}`;
+        deltaEl.style.display = "inline-block";
+      } else {
+        deltaEl.textContent = "Mode Mandiri";
+      }
+    }
+  };
+
+  const covStats = cov?.stats || null;
+  const stgStats = stg?.stats || null;
+  updateStatCard("R", "r", covStats, stgStats);
+  updateStatCard("G", "g", covStats, stgStats);
+  updateStatCard("B", "b", covStats, stgStats);
+}
+
+function setupHistogramChannelToggles() {
+  const container = document.getElementById("histChannelToggles");
+  if (!container) return;
+  const buttons = container.querySelectorAll(".hist-tab");
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      buttons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.histogramChannel = btn.dataset.histChannel || "all";
+      renderHistogramChart();
+    });
+  });
+}
+setupHistogramChannelToggles();
 
 
 // Setup Secret File Picker
@@ -918,6 +1082,13 @@ async function handleSteganalysis() {
         <td>${statusBadge}</td>
       </tr>`;
     }).join("");
+
+    // 4.5. Render Visualisasi Grafik Histogram Kanal RGB (Cover vs Stego)
+    if (data.histogram) {
+      state.lastHistogramData = data.histogram;
+      state.lastRefHistogramData = data.comparison?.reference_histogram || null;
+      renderHistogramChart();
+    }
 
     // 5. Render Visual LSB Planes (Mendukung Dual Komparasi Cover vs Stego)
     if (data.lsb_planes) {

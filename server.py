@@ -261,6 +261,7 @@ def analyze():
             ref_red_lsb = lsb_plane(ref_img, channel=0)
             ref_green_lsb = lsb_plane(ref_img, channel=1)
             ref_blue_lsb = lsb_plane(ref_img, channel=2)
+            ref_hist_data = get_histogram_data(ref_img)
 
             comparison = {
                 "has_reference": True,
@@ -273,6 +274,7 @@ def analyze():
                     "green": image_to_base64(ref_green_lsb, "PNG"),
                     "blue": image_to_base64(ref_blue_lsb, "PNG")
                 },
+                "reference_histogram": ref_hist_data,
                 "comparison_verdict": comparison_verdict,
             }
 
