@@ -413,95 +413,145 @@ function setupLsbViewToggles() {
 }
 setupLsbViewToggles();
 
-// Render dan Visualisasi Histogram Kanal RGB di HTML5 Canvas
-function renderHistogramChart() {
-  const canvas = document.getElementById("histogramCanvas");
-  if (!canvas || !state.lastHistogramData) return;
+// Render dan Visualisasi Histogram 3 Kanal RGB (Format Publikasi Matplotlib)
+function drawMatplotlibSubplot(canvasId, titleId, channelName, colorKey, strokeColor, covBins, stgBins, covStats, stgStats, isBottomAxis = false) {
+  const canvas = document.getElementById(canvasId);
+  const titleEl = document.getElementById(titleId);
+  if (!canvas) return;
 
   const ctx = canvas.getContext("2d");
   const width = canvas.width;
   const height = canvas.height;
-  const padding = { top: 25, right: 30, bottom: 42, left: 60 };
+  const padding = { top: 18, right: 30, bottom: isBottomAxis ? 45 : 22, left: 68 };
   const plotW = width - padding.left - padding.right;
   const plotH = height - padding.top - padding.bottom;
 
-  // Latar belakang kanvas
-  ctx.fillStyle = "#0e1315";
-  ctx.fillRect(0, 0, width, height);
+  const hasCover = Boolean(covBins);
 
-  // Grid horizontal
-  ctx.strokeStyle = "#1a2527";
-  ctx.lineWidth = 1;
-  ctx.fillStyle = "#6a7b79";
-  ctx.font = "11px 'DM Sans', sans-serif";
-
-  for (let i = 0; i <= 4; i++) {
-    const y = padding.top + (plotH / 4) * i;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, y);
-    ctx.lineTo(width - padding.right, y);
-    ctx.stroke();
+  // 1. Update Title Header (Persis Format Matplotlib di Gambar Uji)
+  if (titleEl) {
+    const sMean = stgStats?.[`${colorKey}_mean`];
+    const cMean = covStats?.[`${colorKey}_mean`];
+    if (hasCover && cMean !== undefined && sMean !== undefined) {
+      const delta = (sMean - cMean).toFixed(4);
+      const sign = (sMean - cMean) >= 0 ? "+" : "";
+      titleEl.textContent = `Kanal ${channelName} | Mean Cover: ${cMean.toFixed(2)}, Mean Stego: ${sMean.toFixed(2)} (Delta: ${sign}${delta})`;
+    } else if (sMean !== undefined) {
+      titleEl.textContent = `Kanal ${channelName} | Mean: ${sMean.toFixed(2)} (Mode Mandiri / Single Image)`;
+    }
   }
 
-  // Sumbu X (0, 64, 128, 192, 255)
-  const xTicks = [0, 64, 128, 192, 255];
+  // 2. Clear & Fill White Background
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+
+  // 3. Hitung Skala Y Cerdas (Mencegah Spike Background 255 Menghancurkan Kurva)
+  let middleMax = 10;
+  for (let i = 1; i < 255; i++) {
+    if (stgBins && stgBins[i] > middleMax) middleMax = stgBins[i];
+    if (covBins && covBins[i] > middleMax) middleMax = covBins[i];
+  }
+
+  const edgeMax = Math.max(
+    (stgBins ? Math.max(stgBins[0] || 0, stgBins[255] || 0) : 0),
+    (covBins ? Math.max(covBins[0] || 0, covBins[255] || 0) : 0)
+  );
+
+  let maxY = middleMax > 50 ? middleMax * 1.18 : 100;
+  if (edgeMax > middleMax * 2.5) {
+    // Jika ada spike ekstrem di bin 0 atau 255 (misal background putih/hitam masif),
+    // batasi maxY agar dinamika kurva utama tetap terlihat jelas dan kaya informasi
+    maxY = Math.max(middleMax * 1.25, 100);
+  } else {
+    maxY = Math.max(middleMax * 1.15, edgeMax * 1.05);
+  }
+  maxY = Math.ceil(maxY);
+
+  // 4. Grid Dotted Light Gray
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 3]);
+
+  // Horizontal Grid Lines & Y Ticks
+  ctx.font = "10px sans-serif";
+  ctx.fillStyle = "#334155";
+  ctx.textAlign = "right";
+
+  const yDivs = 3;
+  for (let i = 0; i <= yDivs; i++) {
+    const val = Math.round((maxY / yDivs) * i);
+    const y = padding.top + plotH - (plotH / yDivs) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(padding.left + plotW, y);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+    ctx.fillText(val.toLocaleString(), padding.left - 8, y + 3.5);
+    ctx.setLineDash([2, 3]);
+  }
+
+  // Vertical Grid Lines & X Ticks
+  const xTicks = [0, 50, 100, 150, 200, 255];
   xTicks.forEach((tick) => {
     const x = padding.left + (tick / 255) * plotW;
     ctx.beginPath();
-    ctx.moveTo(x, padding.top + plotH);
-    ctx.lineTo(x, padding.top + plotH + 5);
+    ctx.moveTo(x, padding.top);
+    ctx.lineTo(x, padding.top + plotH);
     ctx.stroke();
-    ctx.textAlign = "center";
-    ctx.fillText(tick, x, padding.top + plotH + 18);
+
+    if (isBottomAxis) {
+      ctx.setLineDash([]);
+      ctx.textAlign = "center";
+      ctx.fillText(tick, x, padding.top + plotH + 17);
+      ctx.setLineDash([2, 3]);
+    }
   });
-  ctx.fillText("Nilai Intensitas Piksel (0 - 255)", padding.left + plotW / 2, padding.top + plotH + 34);
 
-  const stg = state.lastHistogramData;
-  const cov = state.lastRefHistogramData;
-  const hasCover = Boolean(cov);
+  ctx.setLineDash([]);
 
-  const stgLegend = document.getElementById("legendStegoIndicator");
-  if (stgLegend) {
-    stgLegend.style.display = hasCover ? "inline-flex" : "none";
+  // 5. Border Bounding Box Solid (Bingkai Plot Khas Matplotlib)
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(padding.left, padding.top, plotW, plotH);
+
+  // 6. Label Sumbu Y: "Frekuensi Piksel" (Rotasi Vertikal)
+  ctx.save();
+  ctx.translate(18, padding.top + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#1e293b";
+  ctx.font = "600 11px sans-serif";
+  ctx.fillText("Frekuensi Piksel", 0, 0);
+  ctx.restore();
+
+  // Label Sumbu X (Hanya pada plot paling bawah)
+  if (isBottomAxis) {
+    ctx.fillStyle = "#1e293b";
+    ctx.textAlign = "center";
+    ctx.font = "600 11px sans-serif";
+    ctx.fillText("Nilai Intensitas Piksel (0 - 255)", padding.left + plotW / 2, padding.top + plotH + 34);
   }
 
-  // Tentukan batas frekuensi maksimum untuk skala Y
-  let maxVal = 100;
-  const channelsToPlot = state.histogramChannel === "all" ? ["r", "g", "b"] : [state.histogramChannel];
-  channelsToPlot.forEach((ch) => {
-    if (stg && stg[ch]) maxVal = Math.max(maxVal, ...stg[ch]);
-    if (cov && cov[ch]) maxVal = Math.max(maxVal, ...cov[ch]);
-  });
-  maxVal = Math.ceil(maxVal * 1.05);
-
-  // Label sumbu Y
-  ctx.textAlign = "right";
-  ctx.fillText(maxVal.toLocaleString(), padding.left - 8, padding.top + 10);
-  ctx.fillText("0", padding.left - 8, padding.top + plotH);
-
-  const colors = {
-    r: "#e18484",
-    g: "#71ba91",
-    b: "#79a5d1"
-  };
-
-  function drawCurve(bins, strokeColor, isDashed = false) {
+  // 7. Menggambar Kurva (Cover: Garis Solid Warna, Stego: Garis Putus-putus Hitam)
+  function drawCurve(bins, color, isDashed = false) {
     if (!bins || bins.length !== 256) return;
     ctx.save();
     ctx.beginPath();
     if (isDashed) {
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = hasCover ? "#75d6cb" : strokeColor;
-      ctx.lineWidth = 1.6;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = "#111111";
+      ctx.lineWidth = 1.3;
     } else {
       ctx.setLineDash([]);
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.6;
     }
 
     for (let i = 0; i < 256; i++) {
       const x = padding.left + (i / 255) * plotW;
-      const y = padding.top + plotH - (bins[i] / maxVal) * plotH;
+      const count = Math.min(bins[i], maxY);
+      const y = padding.top + plotH - (count / maxY) * plotH;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
@@ -509,67 +559,113 @@ function renderHistogramChart() {
     ctx.restore();
   }
 
-  // Gambar kurva Cover (solid) lalu Stego (putus-putus)
-  channelsToPlot.forEach((ch) => {
-    if (hasCover && cov[ch]) {
-      drawCurve(cov[ch], colors[ch], false);
-    }
-    if (stg && stg[ch]) {
-      drawCurve(stg[ch], colors[ch], hasCover);
-    }
-  });
+  // Gambar Cover (Garis Solid)
+  if (hasCover && covBins) {
+    drawCurve(covBins, strokeColor, false);
+  }
+  // Gambar Stego (Garis Putus-putus Hitam)
+  if (stgBins) {
+    drawCurve(stgBins, hasCover ? "#111111" : strokeColor, hasCover);
+  }
 
-  // Update kartu ringkasan statistik (Mean & Variansi)
-  const updateStatCard = (prefix, chKey, covStats, stgStats) => {
-    const meanEl = document.getElementById(`histMean${prefix}`);
-    const varEl = document.getElementById(`histVar${prefix}`);
-    const deltaEl = document.getElementById(`histDelta${prefix}`);
+  // 8. Legend Box di Kanan Atas (Persis Matplotlib)
+  const legW = 165;
+  const legH = hasCover ? 46 : 26;
+  const legX = padding.left + plotW - legW - 10;
+  const legY = padding.top + 8;
 
-    const sMean = stgStats?.[`${chKey}_mean`];
-    const sVar = stgStats?.[`${chKey}_var`];
-    const cMean = covStats?.[`${chKey}_mean`];
-    const cVar = covStats?.[`${chKey}_var`];
+  ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 1;
+  ctx.fillRect(legX, legY, legW, legH);
+  ctx.strokeRect(legX, legY, legW, legH);
 
-    if (meanEl) {
-      meanEl.textContent = hasCover && cMean !== undefined ? `${cMean} (Cov) / ${sMean} (Stg)` : (sMean ?? "--");
-    }
-    if (varEl) {
-      varEl.textContent = hasCover && cVar !== undefined ? `${cVar} / ${sVar}` : (sVar ?? "--");
-    }
-    if (deltaEl) {
-      if (hasCover && cMean !== undefined && sMean !== undefined) {
-        const delta = (sMean - cMean).toFixed(4);
-        const sign = delta >= 0 ? "+" : "";
-        deltaEl.textContent = `Δ Mean: ${sign}${delta}`;
-        deltaEl.style.display = "inline-block";
-      } else {
-        deltaEl.textContent = "Mode Mandiri";
-      }
-    }
-  };
+  ctx.font = "10px sans-serif";
+  ctx.textAlign = "left";
+
+  if (hasCover) {
+    // Garis Merah/Hijau/Biru untuk Cover
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(legX + 8, legY + 14);
+    ctx.lineTo(legX + 28, legY + 14);
+    ctx.stroke();
+    ctx.fillStyle = "#1e293b";
+    ctx.fillText("Cover (Citra Asli)", legX + 34, legY + 17);
+
+    // Garis Putus-putus Hitam untuk Stego
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(legX + 8, legY + 32);
+    ctx.lineTo(legX + 28, legY + 32);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillText("Stego (Setelah Disisipi)", legX + 34, legY + 35);
+  } else {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(legX + 8, legY + 14);
+    ctx.lineTo(legX + 28, legY + 14);
+    ctx.stroke();
+    ctx.fillStyle = "#1e293b";
+    ctx.fillText("Distribusi Intensitas", legX + 34, legY + 17);
+  }
+}
+
+function renderHistogramChart() {
+  const stg = state.lastHistogramData;
+  const cov = state.lastRefHistogramData;
+  if (!stg) return;
 
   const covStats = cov?.stats || null;
   const stgStats = stg?.stats || null;
-  updateStatCard("R", "r", covStats, stgStats);
-  updateStatCard("G", "g", covStats, stgStats);
-  updateStatCard("B", "b", covStats, stgStats);
-}
 
-function setupHistogramChannelToggles() {
-  const container = document.getElementById("histChannelToggles");
-  if (!container) return;
-  const buttons = container.querySelectorAll(".hist-tab");
+  // Render Subplot 1: Red (Merah)
+  drawMatplotlibSubplot(
+    "histCanvasRed",
+    "histTitleRed",
+    "Merah (Red)",
+    "r",
+    "#d32f2f",
+    cov?.r || null,
+    stg.r || null,
+    covStats,
+    stgStats,
+    false
+  );
 
-  buttons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      buttons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      state.histogramChannel = btn.dataset.histChannel || "all";
-      renderHistogramChart();
-    });
-  });
+  // Render Subplot 2: Green (Hijau)
+  drawMatplotlibSubplot(
+    "histCanvasGreen",
+    "histTitleGreen",
+    "Hijau (Green)",
+    "g",
+    "#2e7d32",
+    cov?.g || null,
+    stg.g || null,
+    covStats,
+    stgStats,
+    false
+  );
+
+  // Render Subplot 3: Blue (Biru - Memuat Label Sumbu X)
+  drawMatplotlibSubplot(
+    "histCanvasBlue",
+    "histTitleBlue",
+    "Biru (Blue)",
+    "b",
+    "#1976d2",
+    cov?.b || null,
+    stg.b || null,
+    covStats,
+    stgStats,
+    true
+  );
 }
-setupHistogramChannelToggles();
 
 
 // Setup Secret File Picker

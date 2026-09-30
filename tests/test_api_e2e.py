@@ -10,7 +10,7 @@ import json
 import base64
 
 def test_api():
-    base_url = "http://localhost:8080"
+    base_url = "http://localhost:8000"
     boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
 
     with open("test_results/sample_cover.png", "rb") as f:

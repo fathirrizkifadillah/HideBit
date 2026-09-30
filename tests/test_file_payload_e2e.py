@@ -11,7 +11,7 @@ import json
 import base64
 import os
 
-BASE_URL = "http://localhost:8080"
+BASE_URL = "http://localhost:8000"
 BOUNDARY = "----WebKitFormBoundary9zXkTrZu0gW7MA4Y"
 
 def test_file_embed_and_extract():

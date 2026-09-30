@@ -583,52 +583,37 @@
       <article class="panel table-panel histogram-panel" id="histogramAnalysisPanel">
         <div class="table-heading">
           <div>
-            <p class="eyebrow">HISTOGRAM FREQUENCY ANALYSIS <span></span></p>
-            <h3>Perbandingan Histogram Distribusi Warna (RGB)</h3>
+            <p class="eyebrow">HISTOGRAM FREQUENCY DISTRIBUTION <span></span></p>
+            <h3>Perbandingan Distribusi Histogram Citra Cover vs Stego (Kanal RGB)</h3>
           </div>
-          <div class="histogram-channel-toggles" id="histChannelToggles">
-            <button class="hist-tab active" data-hist-channel="all" type="button">Semua (RGB)</button>
-            <button class="hist-tab" data-hist-channel="r" type="button">Red</button>
-            <button class="hist-tab" data-hist-channel="g" type="button">Green</button>
-            <button class="hist-tab" data-hist-channel="b" type="button">Blue</button>
-          </div>
+          <span class="vbadge success" id="histBadge">Format Publikasi Ilmiah</span>
         </div>
-        <p class="hist-desc" id="histDesc">Distribusi 256 nilai intensitas piksel (0–255). Pada komparasi cover vs stego, kurva berhimpit membuktikan penyisipan 1-bit LSB teracak tidak merusak karakteristik spektral global citra.</p>
+        <p class="hist-desc" id="histDesc">Visualisasi komparasi 256 bin intensitas per kanal warna. Garis warna (solid) merepresentasikan citra Cover asli, dan garis hitam (putus-putus) merepresentasikan citra Stego setelah disisipi muatan LSB-PRNG.</p>
 
-        <div class="histogram-canvas-wrap">
-          <canvas id="histogramCanvas" width="950" height="260"></canvas>
-          <div class="hist-legend" id="histLegend">
-            <span class="legend-item"><span class="legend-color" style="background:#e18484"></span> Red (Cover)</span>
-            <span class="legend-item"><span class="legend-color" style="background:#71ba91"></span> Green (Cover)</span>
-            <span class="legend-item"><span class="legend-color" style="background:#79a5d1"></span> Blue (Cover)</span>
-            <span class="legend-item" id="legendStegoIndicator"><span class="legend-color" style="background:#111;border:1px dashed #75d6cb"></span> Stego (Dashed / Overlay)</span>
+        <!-- 3 Subplot Histogram Cards (Merah, Hijau, Biru) persis format Matplotlib -->
+        <div class="hist-plots-stack">
+          <!-- Subplot 1: Red -->
+          <div class="hist-subplot-card">
+            <div class="hist-subplot-head">
+              <strong id="histTitleRed">Kanal Merah (Red) | Mean Cover: --, Mean Stego: -- (Delta: --)</strong>
+            </div>
+            <canvas id="histCanvasRed" width="950" height="200"></canvas>
           </div>
-        </div>
 
-        <div class="hist-stats-grid" id="histStatsGrid">
-          <div class="hist-stat-card">
-            <span class="channel-title"><i class="channel-dot red"></i> Kanal Merah</span>
-            <div class="stat-vals">
-              <span>Mean: <b id="histMeanR">--</b></span>
-              <span>Variansi: <b id="histVarR">--</b></span>
-              <small id="histDeltaR">Deviasi Δ: --</small>
+          <!-- Subplot 2: Green -->
+          <div class="hist-subplot-card">
+            <div class="hist-subplot-head">
+              <strong id="histTitleGreen">Kanal Hijau (Green) | Mean Cover: --, Mean Stego: -- (Delta: --)</strong>
             </div>
+            <canvas id="histCanvasGreen" width="950" height="200"></canvas>
           </div>
-          <div class="hist-stat-card">
-            <span class="channel-title"><i class="channel-dot green"></i> Kanal Hijau</span>
-            <div class="stat-vals">
-              <span>Mean: <b id="histMeanG">--</b></span>
-              <span>Variansi: <b id="histVarG">--</b></span>
-              <small id="histDeltaG">Deviasi Δ: --</small>
+
+          <!-- Subplot 3: Blue -->
+          <div class="hist-subplot-card">
+            <div class="hist-subplot-head">
+              <strong id="histTitleBlue">Kanal Biru (Blue) | Mean Cover: --, Mean Stego: -- (Delta: --)</strong>
             </div>
-          </div>
-          <div class="hist-stat-card">
-            <span class="channel-title"><i class="channel-dot blue"></i> Kanal Biru</span>
-            <div class="stat-vals">
-              <span>Mean: <b id="histMeanB">--</b></span>
-              <span>Variansi: <b id="histVarB">--</b></span>
-              <small id="histDeltaB">Deviasi Δ: --</small>
-            </div>
+            <canvas id="histCanvasBlue" width="950" height="230"></canvas>
           </div>
         </div>
       </article>
