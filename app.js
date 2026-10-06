@@ -1205,7 +1205,8 @@ async function handleSteganalysis() {
       verdict: verdict,
       channels: ch,
       comparison: data.comparison || null,
-      refName: state.referenceFile ? state.referenceFile.name : null
+      refName: state.referenceFile ? state.referenceFile.name : null,
+      histogram: data.histogram || null
     };
 
     if (verdictCard) verdictCard.scrollIntoView({ behavior: "smooth", block: "nearest" });

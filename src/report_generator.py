@@ -2,15 +2,22 @@
 src/report_generator.py
 =======================
 Modul Pembangkit Laporan Audit Steganalisis Forensik Format Microsoft Word (.docx)
-Menggunakan font Times New Roman, tata letak tabel rapi berstandar laporan akademik.
+Menggunakan font Times New Roman, visualisasi grafik Histogram RGB,
+dan tata letak tabel rapi berstandar laporan akademik.
 """
 
 import io
 from typing import Dict, Any
+import numpy as np
+
+import matplotlib
+matplotlib.use("Agg")  # Mode headless non-GUI
+import matplotlib.pyplot as plt
+
 import docx
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
+from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 
@@ -33,10 +40,77 @@ def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
     tcPr.append(tcMar)
 
 
+def generate_histogram_chart(report_data: Dict[str, Any]) -> io.BytesIO | None:
+    """
+    Menghasilkan citra grafik perbandingan distribusi histogram 3 kanal RGB
+    dalam format PNG (in-memory) untuk disematkan ke berkas Word.
+    """
+    stego_hist = report_data.get("histogram")
+    if not stego_hist or "r" not in stego_hist:
+        return None
+
+    ref_hist = None
+    comp = report_data.get("comparison")
+    if comp and comp.get("has_reference"):
+        ref_hist = comp.get("reference_histogram")
+
+    has_dual = ref_hist is not None and "r" in ref_hist
+
+    fig, axes = plt.subplots(3, 1, figsize=(7.2, 5.0), dpi=180)
+    fig.patch.set_facecolor("#ffffff")
+
+    x = np.arange(256)
+    channel_info = [
+        ("Kanal Merah (Red)", "r", "#c82333", "#004085"),
+        ("Kanal Hijau (Green)", "g", "#218838", "#5a6268"),
+        ("Kanal Biru (Blue)", "b", "#0069d9", "#17a2b8"),
+    ]
+
+    for ax, (title, key, c_stego, c_ref) in zip(axes, channel_info):
+        ax.set_facecolor("#fafbfc")
+        y_stego = np.array(stego_hist.get(key, [0] * 256), dtype=float)
+
+        if has_dual:
+            y_ref = np.array(ref_hist.get(key, [0] * 256), dtype=float)
+            ax.plot(x, y_ref, label="Cover Asli (Referensi)", color="#2b2d42", linewidth=1.5, linestyle="--", alpha=0.85)
+            ax.plot(x, y_stego, label="Stego (Disisipi Muatan)", color=c_stego, linewidth=1.2, alpha=0.9)
+            
+            # Hitung delta mean
+            s_stg = stego_hist.get("stats", {})
+            s_ref = ref_hist.get("stats", {})
+            m_stg = s_stg.get(f"{key}_mean", 0.0)
+            m_ref = s_ref.get(f"{key}_mean", 0.0)
+            delta_m = abs(m_stg - m_ref)
+            ax.set_title(f"{title} — Mean Cover: {m_ref:.2f} | Mean Stego: {m_stg:.2f} (Δ Mean = {delta_m:.4f})", 
+                         fontsize=8.5, fontfamily="serif", fontweight="bold", pad=4)
+            ax.legend(loc="upper right", fontsize=7.5, framealpha=0.8)
+        else:
+            ax.plot(x, y_stego, color=c_stego, linewidth=1.3, label="Distribusi Intensitas Stego")
+            s_stg = stego_hist.get("stats", {})
+            m_stg = s_stg.get(f"{key}_mean", 0.0)
+            v_stg = s_stg.get(f"{key}_var", 0.0)
+            ax.set_title(f"{title} — Mean: {m_stg:.2f} | Variansi: {v_stg:.2f}", 
+                         fontsize=8.5, fontfamily="serif", fontweight="bold", pad=4)
+
+        ax.set_xlim(0, 255)
+        ax.set_ylabel("Frekuensi", fontsize=7.5, fontfamily="serif")
+        ax.tick_params(axis="both", which="major", labelsize=7)
+        ax.grid(True, linestyle=":", alpha=0.6, color="#cccccc")
+
+    axes[2].set_xlabel("Nilai Intensitas Piksel (0 - 255)", fontsize=8, fontfamily="serif")
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
 def create_forensic_docx_report(report_data: Dict[str, Any]) -> io.BytesIO:
     """
     Menghasilkan berkas Word .docx berisi Laporan Audit Steganalisis Forensik
-    dengan font Times New Roman dan tata letak profesional.
+    dengan font Times New Roman, grafik histogram RGB, dan tata letak profesional.
     """
     doc = docx.Document()
 
@@ -78,7 +152,7 @@ def create_forensic_docx_report(report_data: Dict[str, Any]) -> io.BytesIO:
     # 2. METADATA PEMERIKSAAN
     # ==========================================
     h1 = doc.add_paragraph()
-    h1.paragraph_format.space_before = Pt(10)
+    h1.paragraph_format.space_before = Pt(8)
     h1.paragraph_format.space_after = Pt(4)
     r_h1 = h1.add_run("I. IDENTITAS & METADATA PEMERIKSAAN")
     r_h1.font.name = "Times New Roman"
@@ -318,9 +392,42 @@ def create_forensic_docx_report(report_data: Dict[str, Any]) -> io.BytesIO:
                 set_cell_margins(cell, top=60, bottom=60, left=80, right=80)
 
     # ==========================================
-    # 6. CATATAN PENUTUP & AUTENTIKASI
+    # 6. VISUALISASI DISTRIBUSI HISTOGRAM RGB
     # ==========================================
-    doc.add_paragraph().paragraph_format.space_before = Pt(14)
+    chart_buf = generate_histogram_chart(report_data)
+    if chart_buf:
+        sec_num = "V" if has_comp else "IV"
+        h5 = doc.add_paragraph()
+        h5.paragraph_format.space_before = Pt(14)
+        h5.paragraph_format.space_after = Pt(4)
+        r_h5 = h5.add_run(f"{sec_num}. VISUALISASI DISTRIBUSI HISTOGRAM RGB (256 BIN)")
+        r_h5.font.name = "Times New Roman"
+        r_h5.font.size = Pt(12)
+        r_h5.font.bold = True
+
+        p_chart = doc.add_paragraph()
+        p_chart.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_chart.paragraph_format.space_before = Pt(4)
+        p_chart.paragraph_format.space_after = Pt(4)
+        run_img = p_chart.add_run()
+        run_img.add_picture(chart_buf, width=Inches(6.2))
+
+        p_caption = doc.add_paragraph()
+        p_caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_caption.paragraph_format.space_after = Pt(8)
+        r_cap = p_caption.add_run(
+            "Gambar: Kurva Perbandingan Distribusi Frekuensi Intensitas Piksel Kanal R, G, dan B (0-255).\n"
+            "Kurva yang berhimpit membuktikan integritas fidelitas visual dan ketahanan terhadap deteksi anomali global."
+        )
+        r_cap.font.name = "Times New Roman"
+        r_cap.font.size = Pt(9)
+        r_cap.font.italic = True
+        r_cap.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+
+    # ==========================================
+    # 7. CATATAN PENUTUP & AUTENTIKASI
+    # ==========================================
+    doc.add_paragraph().paragraph_format.space_before = Pt(10)
     p_close = doc.add_paragraph()
     p_close.paragraph_format.space_after = Pt(2)
     r_cl = p_close.add_run(
