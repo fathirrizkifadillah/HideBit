@@ -1219,15 +1219,44 @@ async function handleSteganalysis() {
   }
 }
 
-function downloadForensicReport() {
+async function downloadForensicReport() {
   if (!state.lastAnalysisReport) {
     alert("Jalankan analisis citra terlebih dahulu sebelum mengunduh laporan.");
     return;
   }
 
   const r = state.lastAnalysisReport;
-  const ch = r.channels || {};
+  const btn = document.getElementById("exportReportBtn");
+  const origText = btn ? btn.textContent : "";
+  if (btn) btn.textContent = "Menyiapkan Dokumen...";
 
+  try {
+    const res = await fetch("/api/export-report-docx", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(r),
+    });
+
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cleanName = r.fileName ? r.fileName.replace(/\.[^/.]+$/, "") : "citra";
+      a.download = `laporan-forensik-${cleanName}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (btn) btn.textContent = origText;
+      return;
+    }
+  } catch (err) {
+    console.warn("Ekspor DOCX gagal, beralih ke fallback TXT:", err);
+  }
+
+  // Fallback ke TXT jika endpoint docx bermasalah
+  const ch = r.channels || {};
   let compSection = "";
   if (r.comparison && r.comparison.has_reference) {
     const m = r.comparison.metrics || {};
@@ -1269,26 +1298,21 @@ PROFIL STATISTIK PASANGAN NILAI (PoV) CHI-SQUARE:
 Kanal Red   : Chi2 = ${ch.red?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.red?.degrees_of_freedom ?? "--"}, p-value = ${ch.red?.p_value_display ?? (ch.red?.p_value < 0.0001 ? "< 0.0001" : ch.red?.p_value?.toFixed(4))}, Simetri PoV = ${ch.red?.balance_percent ?? "--"}% [${ch.red?.status ?? "Normal"}]
 Kanal Green : Chi2 = ${ch.green?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.green?.degrees_of_freedom ?? "--"}, p-value = ${ch.green?.p_value_display ?? (ch.green?.p_value < 0.0001 ? "< 0.0001" : ch.green?.p_value?.toFixed(4))}, Simetri PoV = ${ch.green?.balance_percent ?? "--"}% [${ch.green?.status ?? "Normal"}]
 Kanal Blue  : Chi2 = ${ch.blue?.chi_square?.toFixed(2) ?? "--"}, DoF = ${ch.blue?.degrees_of_freedom ?? "--"}, p-value = ${ch.blue?.p_value_display ?? (ch.blue?.p_value < 0.0001 ? "< 0.0001" : ch.blue?.p_value?.toFixed(4))}, Simetri PoV = ${ch.blue?.balance_percent ?? "--"}% [${ch.blue?.status ?? "Normal"}]
-
-Keterangan Ilmiah:
-Uji Chi-Square Pairs of Values (PoV) mengukur apakah frekuensi pasangan nilai piksel (2k, 2k+1)
-terdistribusi secara wajar (heterogen alami). Pada steganografi LSB teracak (PRNG) dengan muatan
-kecil, nilai Chi-Square global tetap tinggi (p-value teoretis < 0.0001) karena modifikasi bit
-tersebar tipis, sehingga dianalisis bersama inspeksi visual Bit-0 Plane dan uji komparasi citra asli.
 ${compSection}
 ========================================================================
-  Diverifikasi oleh Engine Forensik HideBit - Keamanan Informasi & Kriptografi
+  Diverifikasi oleh Engine Forensik HideBit
 ========================================================================`;
 
   const blob = new Blob([reportContent], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `laporan-forensik-${r.fileName.replace(/\.[^/.]+$/, "")}.txt`;
+  a.download = `laporan-forensik-${(r.fileName || "citra").replace(/\.[^/.]+$/, "")}.txt`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  if (btn) btn.textContent = origText;
 }
 
 

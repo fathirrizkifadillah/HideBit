@@ -8,7 +8,7 @@ dan Analisis Steganalisis Chi-Square & Visual LSB Plane.
 import os
 import io
 import traceback
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from PIL import Image
 
 from src.crypto import (
@@ -19,6 +19,7 @@ from src.crypto import (
 from src.stego import embed_payload, extract_payload, get_image_capacity
 from src.steganalysis import analyze_image, lsb_plane, extract_message, extract_payload_data
 from src.metrics import get_image_metrics, get_histogram_data, image_to_base64, generate_difference_heatmap
+from src.report_generator import create_forensic_docx_report
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR)
@@ -57,9 +58,6 @@ def check_capacity():
     file = request.files["image"]
     try:
         img = Image.open(file.stream).convert("RGB")
-        max_dim = 1600
-        if img.width > max_dim or img.height > max_dim:
-            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
         cap = get_image_capacity(img)
         return jsonify({"success": True, "capacity": cap})
     except Exception as e:
@@ -90,9 +88,6 @@ def embed():
     try:
         cover_file = request.files["cover"]
         cover_img = Image.open(cover_file.stream).convert("RGB")
-        max_dim = 1600
-        if cover_img.width > max_dim or cover_img.height > max_dim:
-            cover_img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
         capacity = get_image_capacity(cover_img)
 
         # 1. Enkripsi payload dengan AES-256-GCM + PBKDF2 (kompresi adaptif zlib)
@@ -299,7 +294,31 @@ def analyze():
         return jsonify({"success": False, "error": f"Analisis gagal: {str(e)}"}), 500
 
 
+@app.route("/api/export-report-docx", methods=["POST"])
+def export_report_docx():
+    """Mengekspor laporan audit forensik dalam format Microsoft Word (.docx) Times New Roman."""
+    try:
+        report_data = request.get_json(force=True)
+        if not report_data:
+            return jsonify({"success": False, "error": "Data laporan tidak valid."}), 400
+        
+        docx_stream = create_forensic_docx_report(report_data)
+        raw_name = report_data.get("fileName", "citra").rsplit(".", 1)[0]
+        download_name = f"laporan-forensik-{raw_name}.docx"
+        
+        return send_file(
+            docx_stream,
+            as_attachment=True,
+            download_name=download_name,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"Gagal membuat dokumen Word: {str(e)}"}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     print(f"[*] HideBit Server berjalan di http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)
+
