@@ -17,6 +17,7 @@ const state = {
   secretFile: null,
   coverUrl: null,
   stegoDataUrl: null,
+  stegoWebpDataUrl: null,
   capacityBytes: 0,
   payloadMode: "text", // "text" | "file"
   analysisMode: "blind", // "blind" | "compare"
@@ -48,10 +49,24 @@ function formatBytes(bytes) {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-function readImage(file, callback) {
+function readImage(file, callback, errorCallback) {
+  if (!file) return;
+  const fileName = (file.name || "").toLowerCase();
+  if (file.type === "image/svg+xml" || fileName.endsWith(".svg")) {
+    const msg = "Format SVG (vektor) tidak didukung untuk steganografi LSB spasial. Silakan gunakan citra raster bitmap (PNG, BMP, WEBP).";
+    if (errorCallback) errorCallback(msg);
+    else alert(msg);
+    return;
+  }
   const url = URL.createObjectURL(file);
   const image = new Image();
   image.onload = () => callback(image, url);
+  image.onerror = () => {
+    URL.revokeObjectURL(url);
+    const msg = `Gagal memuat citra "${file.name}". Pastikan berkas adalah citra yang valid (PNG, BMP, WEBP, JPG).`;
+    if (errorCallback) errorCallback(msg);
+    else alert(msg);
+  };
   image.src = url;
 }
 
@@ -139,59 +154,95 @@ function setupImagePicker({
     });
   }
 
-  input.addEventListener("change", async () => {
-    const file = input.files[0];
+  const processFile = (file) => {
     if (!file) return;
 
-    readImage(file, async (image, url) => {
-      const applySelection = (finalFile, finalImg, finalUrl) => {
-        state[`${kind}File`] = finalFile;
-        state[`${kind}Url`] = finalUrl;
+    readImage(
+      file,
+      async (image, url) => {
+        const applySelection = (finalFile, finalImg, finalUrl) => {
+          state[`${kind}File`] = finalFile;
+          state[`${kind}Url`] = finalUrl;
 
-        // 1. Tampilkan thumbnail gambar seketika
-        if (thumb) thumb.src = finalUrl;
-        if (meta) meta.innerHTML = imageMeta(finalFile, finalImg);
-        if (drop) drop.classList.add("hidden");
-        if (card) card.classList.remove("hidden");
+          // 1. Tampilkan thumbnail gambar seketika
+          if (thumb) thumb.src = finalUrl;
+          if (meta) meta.innerHTML = imageMeta(finalFile, finalImg);
+          if (drop) drop.classList.add("hidden");
+          if (card) card.classList.remove("hidden");
 
-        if (kind === "cover") {
-          const cp = document.getElementById("coverPreview");
-          if (cp) cp.innerHTML = `<img src="${finalUrl}" alt="Cover image preview">`;
-          const sz = document.getElementById("resultImageSize");
-          if (sz) sz.textContent = `${finalImg.width} x ${finalImg.height}px`;
+          if (kind === "cover") {
+            const cp = document.getElementById("coverPreview");
+            if (cp) cp.innerHTML = `<img src="${finalUrl}" alt="Cover image preview">`;
+            const sz = document.getElementById("resultImageSize");
+            if (sz) sz.textContent = `${finalImg.width} x ${finalImg.height}px`;
 
-          // Request kapasitas riil ke backend
-          fetchCapacity(finalFile, finalImg);
-        }
-      };
+            // Request kapasitas riil ke backend
+            fetchCapacity(finalFile, finalImg);
+          }
+        };
 
-      const fetchCapacity = async (finalFile, finalImg) => {
-        try {
-          const fd = new FormData();
-          fd.append("image", finalFile);
-          const res = await fetch("/api/capacity", { method: "POST", body: fd });
-          const json = await res.json();
-          if (json.success) {
-            state.capacityBytes = json.capacity.max_payload_bytes;
-            if (meta) meta.innerHTML = imageMeta(finalFile, finalImg, state.capacityBytes);
+        const fetchCapacity = async (finalFile, finalImg) => {
+          try {
+            const fd = new FormData();
+            fd.append("image", finalFile);
+            const res = await fetch("/api/capacity", { method: "POST", body: fd });
+            const json = await res.json();
+            if (json.success) {
+              state.capacityBytes = json.capacity.max_payload_bytes;
+              if (meta) meta.innerHTML = imageMeta(finalFile, finalImg, state.capacityBytes);
+              updateCapacity();
+            } else if (json.error) {
+              alert(json.error);
+              clearSelection();
+            }
+          } catch (err) {
+            console.warn("Gagal mengecek kapasitas backend:", err);
+            state.capacityBytes = Math.max(0, Math.floor((finalImg.width * finalImg.height * 3 - 64) / 8));
             updateCapacity();
           }
-        } catch (err) {
-          console.warn("Gagal mengecek kapasitas backend:", err);
-          state.capacityBytes = Math.max(0, Math.floor((finalImg.width * finalImg.height * 3 - 64) / 8));
-          updateCapacity();
-        }
-      };
+        };
 
-      if (kind === "cover" && (image.width > 1280 || image.height > 1280)) {
-        optimizeCoverImage(file, image, (optFile, optImg, optUrl) => {
-          applySelection(optFile, optImg, optUrl);
-        });
-      } else {
-        applySelection(file, image, url);
+        if (kind === "cover" && (image.width > 1280 || image.height > 1280)) {
+          optimizeCoverImage(file, image, (optFile, optImg, optUrl) => {
+            applySelection(optFile, optImg, optUrl);
+          });
+        } else {
+          applySelection(file, image, url);
+        }
+      },
+      (errorMsg) => {
+        alert(errorMsg);
+        clearSelection();
+      }
+    );
+  };
+
+  input.addEventListener("change", () => {
+    if (input.files && input.files[0]) {
+      processFile(input.files[0]);
+    }
+  });
+
+  if (drop) {
+    drop.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.add("drag-over");
+    });
+    drop.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.remove("drag-over");
+    });
+    drop.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.remove("drag-over");
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processFile(e.dataTransfer.files[0]);
       }
     });
-  });
+  }
 
   return { clearSelection };
 }
@@ -693,20 +744,46 @@ function setupSecretFilePicker() {
     });
   }
 
+  const processSecretFile = (file) => {
+    if (!file) return;
+    state.secretFile = file;
+
+    const ext = file.name.includes(".") ? file.name.split(".").pop().toUpperCase().slice(0, 4) : "FILE";
+    if (badge) badge.textContent = ext;
+    if (meta) {
+      meta.innerHTML = `<strong>${file.name}</strong><span>${formatBytes(file.size)} (${file.size.toLocaleString()} bytes)</span>`;
+    }
+    if (drop) drop.classList.add("hidden");
+    if (card) card.classList.remove("hidden");
+    updateCapacity();
+  };
+
   if (input) {
     input.addEventListener("change", () => {
-      const file = input.files[0];
-      if (!file) return;
-      state.secretFile = file;
-
-      const ext = file.name.includes(".") ? file.name.split(".").pop().toUpperCase().slice(0, 4) : "FILE";
-      if (badge) badge.textContent = ext;
-      if (meta) {
-        meta.innerHTML = `<strong>${file.name}</strong><span>${formatBytes(file.size)} (${file.size.toLocaleString()} bytes)</span>`;
+      if (input.files && input.files[0]) {
+        processSecretFile(input.files[0]);
       }
-      if (drop) drop.classList.add("hidden");
-      if (card) card.classList.remove("hidden");
-      updateCapacity();
+    });
+  }
+
+  if (drop) {
+    drop.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.add("drag-over");
+    });
+    drop.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.remove("drag-over");
+    });
+    drop.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.remove("drag-over");
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processSecretFile(e.dataTransfer.files[0]);
+      }
     });
   }
 
@@ -856,6 +933,7 @@ async function handleHideMessage() {
 
     // Berhasil: simpan stego data url
     state.stegoDataUrl = data.stego_image;
+    state.stegoWebpDataUrl = data.stego_image_webp;
 
     // Tampilkan pratinjau citra stego
     const preview = document.getElementById("stegoPreview");
@@ -1317,7 +1395,7 @@ ${compSection}
 }
 
 
-// Download berkas citra stego asli
+// Download berkas citra stego asli (PNG)
 document.getElementById("downloadButton").addEventListener("click", () => {
   if (!state.stegoDataUrl) {
     alert("Citra stego belum tersedia untuk diunduh.");
@@ -1331,6 +1409,24 @@ document.getElementById("downloadButton").addEventListener("click", () => {
   link.click();
   document.body.removeChild(link);
 });
+
+// Download berkas citra stego format WEBP Lossless
+const dlWebpBtn = document.getElementById("downloadWebpButton");
+if (dlWebpBtn) {
+  dlWebpBtn.addEventListener("click", () => {
+    if (!state.stegoWebpDataUrl) {
+      alert("Citra stego format WebP belum tersedia untuk diunduh.");
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = state.stegoWebpDataUrl;
+    const originalName = state.coverFile ? state.coverFile.name.replace(/\.[^/.]+$/, "") : "stego";
+    link.download = `hidebit-${originalName}.webp`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
 
 // Event Listeners
 document.querySelectorAll("a[href^='#']").forEach((link) => {

@@ -56,6 +56,13 @@ def check_capacity():
         return jsonify({"success": False, "error": "Tidak ada berkas citra yang diunggah."}), 400
     
     file = request.files["image"]
+    fn = (file.filename or "").lower()
+    if fn.endswith(".svg"):
+        return jsonify({
+            "success": False,
+            "error": "Format SVG (vektor) tidak didukung untuk steganografi LSB spasial. Gunakan citra raster (PNG, BMP, WEBP)."
+        }), 400
+
     try:
         img = Image.open(file.stream).convert("RGB")
         cap = get_image_capacity(img)
@@ -87,6 +94,13 @@ def embed():
 
     try:
         cover_file = request.files["cover"]
+        fn = (cover_file.filename or "").lower()
+        if fn.endswith(".svg"):
+            return jsonify({
+                "success": False,
+                "error": "Format SVG (vektor) tidak didukung untuk steganografi LSB spasial. Gunakan citra raster (PNG, BMP, WEBP)."
+            }), 400
+
         cover_img = Image.open(cover_file.stream).convert("RGB")
         capacity = get_image_capacity(cover_img)
 
@@ -118,14 +132,17 @@ def embed():
         # 4. Hitung persentase kapasitas yang digunakan
         used_percent = round((payload_len / max(1, capacity["max_payload_bytes"])) * 100, 2)
 
-        # 5. Konversi stego image & difference heatmap ke Base64 PNG data URL
+        # 5. Konversi stego image & difference heatmap ke Base64 (PNG & WebP Lossless)
         stego_b64 = image_to_base64(stego_img, "PNG")
+        stego_webp_b64 = image_to_base64(stego_img, "WEBP", lossless=True)
         diff_img = generate_difference_heatmap(cover_img, stego_img)
         diff_b64 = image_to_base64(diff_img, "PNG")
 
         return jsonify({
             "success": True,
             "stego_image": stego_b64,
+            "stego_image_webp": stego_webp_b64,
+            "is_cover_webp": fn.endswith(".webp"),
             "difference_map": diff_b64,
             "metrics": metrics,
             "compression": comp_info,
@@ -160,6 +177,22 @@ def extract():
 
     try:
         stego_file = request.files["stego"]
+        fn = (stego_file.filename or "").lower()
+        if fn.endswith(".svg"):
+            return jsonify({
+                "success": False,
+                "error": "Format SVG (vektor) tidak didukung untuk ekstraksi LSB. Silakan unggah citra raster (PNG, BMP, WEBP Lossless)."
+            }), 400
+
+        # Deteksi format asli sebelum konversi RGB
+        orig_format = None
+        try:
+            probe = Image.open(stego_file.stream)
+            orig_format = probe.format
+            stego_file.stream.seek(0)
+        except Exception:
+            orig_format = None
+
         stego_img = Image.open(stego_file.stream).convert("RGB")
 
         # Ekstrak payload dari LSB PRNG dan dekripsi dengan AES-256-GCM
@@ -184,7 +217,13 @@ def extract():
             })
 
     except ValueError as ve:
-        return jsonify({"success": False, "error": str(ve)}), 400
+        err_msg = str(ve)
+        if orig_format in ("JPEG", "JPG") or (orig_format == "WEBP" and "salah atau citra tidak mengandung" in err_msg):
+            err_msg += (
+                f" (Perhatian: Citra terdeteksi berformat {orig_format}. Kompresi lossy seperti JPEG atau WebP Lossy "
+                "merusak bit-bit LSB steganografi secara permanen. Pastikan menggunakan citra stego asli berformat PNG atau WebP Lossless)."
+            )
+        return jsonify({"success": False, "error": err_msg}), 400
     except Exception as e:
         return jsonify({"success": False, "error": f"Gagal mengekstrak: {str(e)}"}), 500
 
@@ -200,6 +239,13 @@ def analyze():
 
     try:
         img_file = request.files["image"]
+        fn = (img_file.filename or "").lower()
+        if fn.endswith(".svg"):
+            return jsonify({
+                "success": False,
+                "error": "Format SVG (vektor) tidak didukung untuk steganalisis LSB. Silakan unggah citra raster (PNG, BMP, WEBP)."
+            }), 400
+
         img = Image.open(img_file.stream).convert("RGB")
 
         # 1. Analisis statistik Chi-Square PoV + Vonis Forensik
@@ -217,6 +263,13 @@ def analyze():
         comparison = None
         if "reference" in request.files and request.files["reference"].filename:
             ref_file = request.files["reference"]
+            ref_fn = (ref_file.filename or "").lower()
+            if ref_fn.endswith(".svg"):
+                return jsonify({
+                    "success": False,
+                    "error": "Format SVG (vektor) tidak didukung untuk citra referensi. Gunakan citra raster (PNG, BMP, WEBP)."
+                }), 400
+
             ref_img = Image.open(ref_file.stream).convert("RGB")
             if ref_img.size != img.size:
                 return jsonify({

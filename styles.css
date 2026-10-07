@@ -192,4 +192,7 @@
 .hist-subplot-head{text-align:center;margin-bottom:6px}
 .hist-subplot-head strong{font-family:"Space Grotesk",sans-serif;font-size:13px;color:#1a202c;font-weight:700}
 .hist-subplot-card canvas{width:100%;max-width:100%;height:auto;display:block}
+
+/* Drag and Drop Hover Feedback */
+.upload-zone.drag-over{border-color:var(--teal);background:rgba(23,162,139,0.08);transform:scale(1.008);box-shadow:0 0 0 3px rgba(23,162,139,0.18)}
 

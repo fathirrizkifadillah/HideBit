@@ -113,14 +113,20 @@ def get_histogram_data(image: Image.Image) -> Dict[str, Any]:
     }
 
 
-def image_to_base64(image: Image.Image, format_type: str = "PNG") -> str:
+def image_to_base64(image: Image.Image, format_type: str = "PNG", lossless: bool = True) -> str:
     """
     Mengubah PIL Image menjadi Base64 Data URL string agar bisa dirender langsung di HTML <img>.
+    Mendukung format PNG, WEBP (Lossless untuk menjamin integritas LSB), dan JPEG.
     """
     buffer = io.BytesIO()
-    image.save(buffer, format=format_type)
+    fmt = format_type.upper()
+    if fmt == "WEBP":
+        image.save(buffer, format="WEBP", lossless=lossless)
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"data:image/webp;base64,{encoded}"
+    image.save(buffer, format=fmt)
     encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    mime = "image/png" if format_type.upper() == "PNG" else "image/jpeg"
+    mime = "image/png" if fmt == "PNG" else "image/jpeg"
     return f"data:{mime};base64,{encoded}"
 
 
