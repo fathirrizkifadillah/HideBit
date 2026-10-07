@@ -244,6 +244,17 @@ function setupImagePicker({
     });
   }
 
+  if (drop && input) {
+    const chooseBtn = drop.querySelector("button");
+    if (chooseBtn) {
+      chooseBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        input.click();
+      });
+    }
+  }
+
   return { clearSelection };
 }
 
@@ -785,6 +796,17 @@ function setupSecretFilePicker() {
         processSecretFile(e.dataTransfer.files[0]);
       }
     });
+  }
+
+  if (drop && input) {
+    const chooseBtn = drop.querySelector("button");
+    if (chooseBtn) {
+      chooseBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        input.click();
+      });
+    }
   }
 
   return { clear };

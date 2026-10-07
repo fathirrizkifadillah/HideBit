@@ -195,4 +195,25 @@
 
 /* Drag and Drop Hover Feedback */
 .upload-zone.drag-over{border-color:var(--teal);background:rgba(23,162,139,0.08);transform:scale(1.008);box-shadow:0 0 0 3px rgba(23,162,139,0.18)}
+
+/* Upload Zone Button Interactivity */
+.upload-zone .button,
+.upload-zone button {
+  position: relative;
+  z-index: 5;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.15s ease;
+}
+.upload-zone .button:hover,
+.upload-zone button:hover {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+  transform: translateY(-1px);
+}
+.upload-zone .button:active,
+.upload-zone button:active {
+  transform: translateY(0);
+}
 

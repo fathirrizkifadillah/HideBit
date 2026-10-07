@@ -80,7 +80,7 @@
                 <h3>Cover Image</h3>
                 <p>Pilih citra pembawa muatan rahasia.</p>
               </div>
-            </div><label class="upload-zone" id="coverDrop"><input id="coverInput" type="file"
+            </div><label class="upload-zone" id="coverDrop" for="coverInput"><input id="coverInput" type="file"
                 accept="image/png,image/jpeg,image/bmp,image/webp,.png,.jpg,.jpeg,.bmp,.webp"><span
                 class="upload-icon">+</span><strong>Upload Cover Image</strong><small>PNG, JPG, BMP, WEBP</small><button
                 class="button secondary" type="button">Pilih Gambar</button></label>
@@ -107,7 +107,7 @@
                 placeholder="Ketik pesan rahasia di sini..."></textarea>
               <div class="field-foot"><span>UTF-8 text</span><span id="charCount">0 / 50000</span></div>
             </div>
-            <div id="filePayloadSection" class="hidden"><label class="upload-zone compact" id="secretFileDrop"><input
+            <div id="filePayloadSection" class="hidden"><label class="upload-zone compact" id="secretFileDrop" for="secretFileInput"><input
                   id="secretFileInput" type="file"><span class="upload-icon">+</span><strong>Pilih Berkas
                   Rahasia</strong><small>PDF, DOCX, ZIP, TXT, XLSX, atau format apa pun</small><button
                   class="button secondary" type="button">Pilih Berkas</button></label>
@@ -270,7 +270,7 @@
                 <h3>Stego Image</h3>
                 <p>Unggah citra yang telah diproses oleh HideBit.</p>
               </div>
-            </div><label class="upload-zone compact" id="stegoDrop"><input id="stegoInput" type="file"
+            </div><label class="upload-zone compact" id="stegoDrop" for="stegoInput"><input id="stegoInput" type="file"
                 accept="image/png,image/jpeg,image/bmp,image/webp,.png,.jpg,.jpeg,.bmp,.webp"><span
                 class="upload-icon">+</span><strong>Upload Stego Image</strong><small>PNG, BMP, JPG, WEBP</small><button
                 class="button secondary" type="button">Pilih Gambar</button></label>
@@ -391,7 +391,7 @@
             </div>
           </div>
 
-          <label class="upload-zone compact" id="analysisDrop">
+          <label class="upload-zone compact" id="analysisDrop" for="analysisInput">
             <input id="analysisInput" type="file"
               accept="image/png,image/jpeg,image/bmp,image/webp,.png,.jpg,.jpeg,.bmp,.webp">
             <span class="upload-icon">+</span>
@@ -417,7 +417,7 @@
               <span class="ref-kicker">CITRA REFERENSI ASLI (COVER)</span>
               <p>Diperlukan untuk komparasi langsung, kalkulasi PSNR, MSE, & heatmap selisih.</p>
             </div>
-            <label class="upload-zone compact" id="referenceDrop">
+            <label class="upload-zone compact" id="referenceDrop" for="referenceInput">
               <input id="referenceInput" type="file"
                 accept="image/png,image/jpeg,image/bmp,image/webp,.png,.jpg,.jpeg,.bmp,.webp">
               <span class="upload-icon">+</span>
